@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+<head>
+    <title>Chats</title>
+    <script>
+        function showJoinForm() {
+            document.getElementById('join-form').style.display = 'block';
+            document.getElementById('create-form').style.display = 'none';
+        }
+
+        function showCreateForm() {
+            document.getElementById('join-form').style.display = 'none';
+            document.getElementById('create-form').style.display = 'block';
+        }
+
+        function loadChats() {
+            fetch('/get_chats')
+                .then(response => response.json())
+                .then(data => {
+                    let chatList = document.getElementById('chat-list');
+                    chatList.innerHTML = '';
+                    data.chats.forEach(chat => {
+                        chatList.innerHTML += '<div><a href="/chat_room/' + chat.chat_id + '">' + chat.encryption_key + '</a></div>';
+                    });
+                });
+        }
+
+        window.onload = function() {
+            loadChats();
+        };
+    </script>
+</head>
+<body>
+    <h1>Chats</h1>
+    <div id="chat-list"></div>
+    <br>
+    <button onclick="showJoinForm()">Join</button>
+    <button onclick="showCreateForm()">Create</button>
+    <div id="join-form" style="display:none;">
+        <form method="post" action="{{ url_for('chat') }}">
+            <input type="hidden" name="action" value="join">
+            Encryption Key: <input type="text" name="encryption_key"><br>
+            <input type="submit" value="Join Chat">
+        </form>
+    </div>
+    <div id="create-form" style="display:none;">
+        <form method="post" action="{{ url_for('chat') }}">
+            <input type="hidden" name="action" value="create">
+            <input type="submit" value="Create Chat">
+        </form>
+    </div>
+</body>
+</html>

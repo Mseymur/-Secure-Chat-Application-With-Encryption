@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+<head>
+    <title>Chat Room</title>
+    <script>
+        function loadChat() {
+            fetch('/get_messages/{{ chat_id }}')
+                .then(response => response.json())
+                .then(data => {
+                    let chatArea = document.getElementById('chat-area');
+                    chatArea.innerHTML = '';
+                    data.messages.forEach(message => {
+                        chatArea.innerHTML += '<p><strong>' + message.sender + ':</strong> ' + message.message + '</p>';
+                    });
+                });
+        }
+
+        function sendMessage() {
+            let message = document.getElementById('message').value;
+            fetch('/send_message/{{ chat_id }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message: message })
+            }).then(response => response.json()).then(data => {
+                if (data.success) {
+                    document.getElementById('message').value = '';
+                    loadChat();
+                }
+            });
+        }
+
+        function deleteChat() {
+            fetch('/delete_chat/{{ chat_id }}', {
+                method: 'POST'
+            }).then(response => response.json()).then(data => {
+                if (data.success) {
+                    window.location.href = "{{ url_for('chat') }}";
+                }
+            });
+        }
+
+        window.onload = function() {
+            loadChat();
+            setInterval(loadChat, 1000);
+        };
+    </script>
+</head>
+<body>
+    <h1>Chat Room</h1>
+    <button onclick="deleteChat()">Delete Chat</button>
+    <div id="chat-area"></div>
+    <input type="text" id="message" placeholder="Type your message here...">
+    <button onclick="sendMessage()">Send</button>
+</body>
+</html>
