@@ -1,7 +1,8 @@
 <!doctype html>
 <html>
 <head>
-    <title>Chat Room</title>
+    <title>Chat Room - {{ chat_name }}</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
     <script>
         function loadChat() {
             fetch('/get_messages/{{ chat_id }}')
@@ -10,7 +11,14 @@
                     let chatArea = document.getElementById('chat-area');
                     chatArea.innerHTML = '';
                     data.messages.forEach(message => {
-                        chatArea.innerHTML += '<p><strong>' + message.sender + ':</strong> ' + message.message + '</p>';
+                        let messageElement = document.createElement('p');
+                        messageElement.textContent = message.message;
+                        if (message.sender === '{{ username }}') {
+                            messageElement.classList.add('sender');
+                        } else {
+                            messageElement.classList.add('receiver');
+                        }
+                        chatArea.appendChild(messageElement);
                     });
                 });
         }
@@ -41,6 +49,33 @@
             });
         }
 
+        function toggleEncryptionKey() {
+            const keyElement = document.getElementById('encryption-key');
+            const toggleButton = document.getElementById('toggle-key');
+            if (keyElement.type === 'password') {
+                keyElement.type = 'text';
+                toggleButton.textContent = 'Hide Key';
+            } else {
+                keyElement.type = 'password';
+                toggleButton.textContent = 'Show Key';
+            }
+        }
+
+        function editChatName() {
+            const newChatName = document.getElementById('new_chat_name').value;
+            fetch('/edit_chat_name/{{ chat_id }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ new_chat_name: newChatName })
+            }).then(response => response.json()).then(data => {
+                if (data.success) {
+                    document.getElementById('chat_name').textContent = newChatName;
+                }
+            });
+        }
+
         window.onload = function() {
             loadChat();
             setInterval(loadChat, 1000);
@@ -48,10 +83,23 @@
     </script>
 </head>
 <body>
-    <h1>Chat Room</h1>
-    <button onclick="deleteChat()">Delete Chat</button>
-    <div id="chat-area"></div>
-    <input type="text" id="message" placeholder="Type your message here...">
-    <button onclick="sendMessage()">Send</button>
+    <div class="container">
+        <header id="chat_name">{{ chat_name }}</header>
+        <div id="chat-name-change-panel">
+            <input type="text" id="new_chat_name" placeholder="Enter new chat name...">
+            <button class="primary" onclick="editChatName()">Change Name</button>
+            <button class="secondary" onclick="deleteChat()">Delete Chat</button>
+            <a href="{{ url_for('chat') }}"><button class="accent">Back to Chats</button></a>
+        </div>
+        <div id="chat-area"></div>
+        <div id="message-input-section">
+            <input type="text" id="message" placeholder="Type your message here...">
+            <button class="primary" onclick="sendMessage()">Send</button>
+        </div>
+        <div class="encryption-key">
+            <input type="password" id="encryption-key" value="{{ encryption_key }}" readonly>
+            <button id="toggle-key" class="primary" onclick="toggleEncryptionKey()">Show Key</button>
+        </div>
+    </div>
 </body>
 </html>

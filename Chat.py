@@ -11,10 +11,11 @@ app.secret_key = 'supersecretkey'
 # Database configuration
 DB_NAME = 'users.db'
 
-# Function to initialize the database
+# Function to initialize the database and update schema
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
+    # Create users table if it doesn't exist
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -22,6 +23,7 @@ def init_db():
         password TEXT NOT NULL
     )
     ''')
+    # Create chats table if it doesn't exist
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS chats (
         chat_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,6 +34,16 @@ def init_db():
         FOREIGN KEY (user2_id) REFERENCES users (id)
     )
     ''')
+    # Add chat_name column if it doesn't exist
+    cursor.execute('''
+    PRAGMA table_info(chats);
+    ''')
+    columns = [col[1] for col in cursor.fetchall()]
+    if 'chat_name' not in columns:
+        cursor.execute('''
+        ALTER TABLE chats ADD COLUMN chat_name TEXT;
+        ''')
+    # Create messages table if it doesn't exist
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS messages (
         message_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -109,9 +121,10 @@ def chat():
         action = request.form['action']
         if action == 'create':
             encryption_key = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+            chat_name = request.form['chat_name']
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
-            cursor.execute('INSERT INTO chats (encryption_key, user1_id) VALUES (?, ?)', (encryption_key, user_id))
+            cursor.execute('INSERT INTO chats (encryption_key, chat_name, user1_id) VALUES (?, ?, ?)', (encryption_key, chat_name, user_id))
             conn.commit()
             chat_id = cursor.lastrowid
             conn.close()
@@ -198,13 +211,35 @@ def delete_chat(chat_id):
     
     return jsonify(success=True)
 
+# Route to delete all chats
+@app.route('/delete_all_chats', methods=['POST'])
+def delete_all_chats():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM messages')
+    cursor.execute('DELETE FROM chats')
+    conn.commit()
+    conn.close()
+    
+    return jsonify(success=True)
+
 # Route to display chat room
 @app.route('/chat_room/<int:chat_id>')
 def chat_room(chat_id):
     if 'username' not in session:
         return redirect(url_for('login'))
     
-    return render_template('chat_room.html', chat_id=chat_id)
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('SELECT chat_name, encryption_key FROM chats WHERE chat_id = ?', (chat_id,))
+    chat = cursor.fetchone()
+    chat_name, encryption_key = chat
+    conn.close()
+    
+    return render_template('chat_room.html', chat_id=chat_id, username=session['username'], chat_name=chat_name, encryption_key=encryption_key)
 
 # Route to get joined chats
 @app.route('/get_chats', methods=['GET'])
@@ -215,11 +250,18 @@ def get_chats():
     user_id = session['user_id']
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute('SELECT chat_id, encryption_key FROM chats WHERE user1_id = ? OR user2_id = ?', (user_id, user_id))
+    cursor.execute('SELECT chat_id, encryption_key, chat_name FROM chats WHERE user1_id = ? OR user2_id = ?', (user_id, user_id))
     chats = cursor.fetchall()
     conn.close()
     
-    return jsonify(chats=[{'chat_id': chat[0], 'encryption_key': chat[1]} for chat in chats])
+    return jsonify(chats=[{'chat_id': chat[0], 'encryption_key': chat[1], 'chat_name': chat[2]} for chat in chats])
+
+# Route to logout
+@app.route('/logout')
+def logout():
+    session.pop('username', None)
+    session.pop('user_id', None)
+    return redirect(url_for('home'))
 
 if __name__ == '__main__':
     init_db()

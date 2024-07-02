@@ -1,0 +1,174 @@
+/* Define color palette */
+:root {
+    --primary-color: #4CAF50; /* Green */
+    --secondary-color: #f44336; /* Red */
+    --accent-color: #2196F3; /* Blue */
+    --bg-color: #121212; /* Dark background */
+    --text-color: #ffffff; /* White text */
+    --text-muted-color: #b3b3b3; /* Muted text color */
+  }
+  
+  /* Global styles */
+  body {
+    font-family: 'Roboto', sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+  }
+  
+  h1, header {
+    color: var(--text-color);
+    text-align: center;
+    font-size: 1.5em;
+  }
+  
+  .container {
+    background-color: #1E1E1E;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 255, 0, 0.1);
+    max-width: 600px;
+    width: 100%;
+    text-align: center;
+  }
+  
+  button {
+    padding: 10px 20px;
+    border-radius: 5px;
+    color: var(--text-color);
+    cursor: pointer;
+    margin: 5px;
+    border: 2px solid transparent;
+    transition: border-color 0.3s ease;
+  }
+  
+  button:hover {
+    opacity: 0.9;
+  }
+  
+  button.primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+  }
+  
+  button.secondary {
+    background-color: var(--secondary-color);
+    border-color: var(--secondary-color);
+  }
+  
+  button.accent {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+  }
+  
+  input[type="text"], input[type="password"] {
+    padding: 10px;
+    border: 1px solid var(--primary-color);
+    border-radius: 5px;
+    width: calc(100% - 22px); /* To account for padding */
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    margin-bottom: 10px;
+  }
+  
+  a {
+    text-decoration: none;
+    color: var(--accent-color);
+    margin: 10px 0;
+  }
+  
+  a:hover {
+    text-decoration: underline;
+  }
+  
+  #chat-name-change-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: var(--bg-color);
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+  }
+  
+  #message-input-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background-color: var(--bg-color);
+    border-top: 1px solid var(--primary-color);
+    margin-top: 20px;
+  }
+  
+  #message-input-section input[type="text"] {
+    flex-grow: 1;
+    padding: 10px;
+    border: 1px solid var(--primary-color);
+    border-radius: 5px;
+    margin-right: 10px;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+  }
+  
+  #message-input-section button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    background-color: var(--primary-color);
+    color: var(--text-color);
+    cursor: pointer;
+  }
+  
+  /* Chat area styles */
+  #chat-area {
+    background-color: #1E1E1E;
+    padding: 10px;
+    border-radius: 10px;
+    height: 400px;
+    overflow-y: scroll;
+    margin-bottom: 10px;
+    flex-grow: 1;
+    color: var(--text-color);
+  }
+  
+  #chat-area p {
+    margin: 5px 0;
+    padding: 10px;
+    border-radius: 10px;
+    max-width: 70%;
+  }
+  
+  #chat-area p.sender {
+    background-color: var(--primary-color);
+    color: var(--text-color);
+    align-self: flex-end;
+  }
+  
+  #chat-area p.receiver {
+    background-color: var(--accent-color);
+    color: var(--text-color);
+    align-self: flex-start;
+  }
+  
+  /* Encryption key styles */
+  .encryption-key {
+    display: flex;
+    align-items: center;
+    margin-top: 10px;
+  }
+  
+  .encryption-key input {
+    margin-right: 10px;
+    padding: 10px;
+    border: 1px solid var(--primary-color);
+    border-radius: 5px;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+  }
+  

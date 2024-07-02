@@ -1,10 +1,17 @@
 <!doctype html>
 <html>
 <head>
-    <title>Home</title>
+    <title>Welcome to Secure Chat!</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-    <h1>Welcome!</h1>
-    <a href="{{ url_for('login') }}">Login</a> or <a href="{{ url_for('signup') }}">Sign Up</a>
+    <div class="container">
+        <header>Welcome to Secure Chat!</header>
+        <p>Connect securely with your friends and colleagues.</p>
+        <div>
+            <a href="{{ url_for('login') }}"><button class="primary">Login</button></a>
+            <a href="{{ url_for('signup') }}"><button class="accent">Sign Up</button></a>
+        </div>
+    </div>
 </body>
 </html>
