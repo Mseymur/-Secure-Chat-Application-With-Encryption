@@ -47,3 +47,35 @@ Technical Implementation:
 * Cryptography Library: Used for encrypting and decrypting messages to ensure data security.
 * JavaScript and AJAX: Enables real-time messaging by periodically fetching new messages and sending user input to the server.
 * HTML Templates: Rendered by Flask, these templates provide the user interface for login, sign-up, chat management, and the chat room.
+
+## Setup Instructions
+
+1. Create and activate a Python virtual environment.
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+2. Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+These pinned versions install Flask 3 and Werkzeug 3 to avoid the
+`ImportError: cannot import name 'url_quote'` that occurs with older
+Flask releases and newer Werkzeug.
+
+3. Run the application:
+
+```bash
+python Chat.py
+```
+
+The app will start on `http://localhost:5000`.
+
+### Features
+- Passwords are hashed using Werkzeug for secure storage.
+- Each chat uses its own encryption key which is persisted in the database.
+- Real-time messaging is handled by Flask-SocketIO.
+

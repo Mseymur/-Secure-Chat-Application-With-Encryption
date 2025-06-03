@@ -2,11 +2,15 @@ import sqlite3
 import random
 import string
 import base64
+from datetime import datetime
 from cryptography.fernet import Fernet
 from flask import Flask, request, render_template, redirect, url_for, session, jsonify
+from flask_socketio import SocketIO, join_room, emit
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Database configuration
 DB_NAME = 'users.db'
@@ -50,16 +54,19 @@ def init_db():
         chat_id INTEGER NOT NULL,
         sender_id INTEGER NOT NULL,
         message TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
         FOREIGN KEY (chat_id) REFERENCES chats (chat_id),
         FOREIGN KEY (sender_id) REFERENCES users (id)
     )
     ''')
+    # Ensure timestamp column exists
+    cursor.execute('PRAGMA table_info(messages);')
+    msg_columns = [col[1] for col in cursor.fetchall()]
+    if 'timestamp' not in msg_columns:
+        cursor.execute('ALTER TABLE messages ADD COLUMN timestamp TEXT;')
     conn.commit()
     conn.close()
 
-# Generate encryption key for encrypting messages
-encryption_key = Fernet.generate_key()
-cipher = Fernet(encryption_key)
 
 # Route for the home page
 @app.route('/')
@@ -74,14 +81,14 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        
+
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute('SELECT id FROM users WHERE username = ? AND password = ?', (username, password))
+        cursor.execute('SELECT id, password FROM users WHERE username = ?', (username,))
         user = cursor.fetchone()
         conn.close()
-        
-        if user:
+
+        if user and check_password_hash(user[1], password):
             session['username'] = username
             session['user_id'] = user[0]
             return redirect(url_for('chat'))
@@ -100,7 +107,8 @@ def signup():
         cursor = conn.cursor()
         
         try:
-            cursor.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, password))
+            hashed_password = generate_password_hash(password)
+            cursor.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, hashed_password))
             conn.commit()
             conn.close()
             return redirect(url_for('login'))
@@ -120,7 +128,7 @@ def chat():
     if request.method == 'POST':
         action = request.form['action']
         if action == 'create':
-            encryption_key = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+            encryption_key = Fernet.generate_key().decode()
             chat_name = request.form['chat_name']
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
@@ -160,20 +168,28 @@ def get_messages(chat_id):
     user_id = session['user_id']
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
+    cursor.execute('SELECT user1_id, user2_id, encryption_key FROM chats WHERE chat_id = ?', (chat_id,))
+    chat = cursor.fetchone()
+    if not chat or user_id not in chat[:2]:
+        conn.close()
+        return jsonify(messages=[])
+    encryption_key = chat[2]
     cursor.execute('''
-        SELECT messages.message, users.username
+        SELECT messages.message, messages.timestamp, users.username
         FROM messages
         JOIN users ON messages.sender_id = users.id
         WHERE messages.chat_id = ?
+        ORDER BY messages.message_id ASC
     ''', (chat_id,))
     messages = cursor.fetchall()
     conn.close()
-    
+
     decrypted_messages = []
-    for message in messages:
-        decrypted_message = cipher.decrypt(base64.b64decode(message[0])).decode()
-        decrypted_messages.append({'sender': message[1], 'message': decrypted_message})
-    
+    cipher = Fernet(encryption_key.encode())
+    for msg in messages:
+        decrypted_message = cipher.decrypt(base64.b64decode(msg[0])).decode()
+        decrypted_messages.append({'sender': msg[2], 'message': decrypted_message, 'timestamp': msg[1]})
+
     return jsonify(messages=decrypted_messages)
 
 # Route to send chat messages
@@ -186,14 +202,44 @@ def send_message(chat_id):
     data = request.get_json()
     message = data['message']
     
-    encrypted_message = base64.b64encode(cipher.encrypt(message.encode())).decode()
-    
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute('INSERT INTO messages (chat_id, sender_id, message) VALUES (?, ?, ?)', (chat_id, user_id, encrypted_message))
+    cursor.execute('SELECT user1_id, user2_id, encryption_key FROM chats WHERE chat_id = ?', (chat_id,))
+    chat = cursor.fetchone()
+    if not chat or user_id not in chat[:2]:
+        conn.close()
+        return jsonify(success=False)
+    encryption_key = chat[2]
+
+    cipher = Fernet(encryption_key.encode())
+    encrypted_message = base64.b64encode(cipher.encrypt(message.encode())).decode()
+    timestamp = datetime.utcnow().isoformat()
+    cursor.execute('INSERT INTO messages (chat_id, sender_id, message, timestamp) VALUES (?, ?, ?, ?)',
+                   (chat_id, user_id, encrypted_message, timestamp))
     conn.commit()
     conn.close()
-    
+
+    return jsonify(success=True)
+
+# Route to edit chat name
+@app.route('/edit_chat_name/<int:chat_id>', methods=['POST'])
+def edit_chat_name(chat_id):
+    if 'username' not in session:
+        return redirect(url_for('login'))
+
+    new_name = request.get_json().get('new_chat_name')
+    user_id = session['user_id']
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('SELECT user1_id, user2_id FROM chats WHERE chat_id = ?', (chat_id,))
+    chat = cursor.fetchone()
+    if not chat or user_id not in chat:
+        conn.close()
+        return jsonify(success=False)
+    cursor.execute('UPDATE chats SET chat_name = ? WHERE chat_id = ?', (new_name, chat_id))
+    conn.commit()
+    conn.close()
     return jsonify(success=True)
 
 # Route to delete chat
@@ -256,6 +302,46 @@ def get_chats():
     
     return jsonify(chats=[{'chat_id': chat[0], 'encryption_key': chat[1], 'chat_name': chat[2]} for chat in chats])
 
+# Socket.IO events
+@socketio.on('join')
+def handle_join(data):
+    chat_id = data.get('chat_id')
+    user_id = session.get('user_id')
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('SELECT user1_id, user2_id FROM chats WHERE chat_id = ?', (chat_id,))
+    chat = cursor.fetchone()
+    conn.close()
+    if chat and user_id in chat:
+        join_room(str(chat_id))
+        emit('status', {'msg': 'Joined room'}, room=str(chat_id))
+
+@socketio.on('send_message')
+def handle_socket_message(data):
+    chat_id = data.get('chat_id')
+    message = data.get('message')
+    user_id = session.get('user_id')
+    if not message:
+        return
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('SELECT user1_id, user2_id, encryption_key FROM chats WHERE chat_id = ?', (chat_id,))
+    chat = cursor.fetchone()
+    if not chat or user_id not in chat[:2]:
+        conn.close()
+        return
+    encryption_key = chat[2]
+    cipher = Fernet(encryption_key.encode())
+    encrypted_message = base64.b64encode(cipher.encrypt(message.encode())).decode()
+    timestamp = datetime.utcnow().isoformat()
+    cursor.execute('INSERT INTO messages (chat_id, sender_id, message, timestamp) VALUES (?, ?, ?, ?)',
+                   (chat_id, user_id, encrypted_message, timestamp))
+    conn.commit()
+    cursor.execute('SELECT username FROM users WHERE id = ?', (user_id,))
+    sender_name = cursor.fetchone()[0]
+    conn.close()
+    emit('receive_message', {'sender': sender_name, 'message': message, 'timestamp': timestamp}, room=str(chat_id))
+
 # Route to logout
 @app.route('/logout')
 def logout():
@@ -265,4 +351,4 @@ def logout():
 
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
