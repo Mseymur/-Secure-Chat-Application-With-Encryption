@@ -6,7 +6,7 @@ In the digital age, secure communication is paramount. Many messaging platforms 
 
 * Create and Join Chats: Users should be able to create new chat sessions with unique encryption keys or join existing ones using these keys.
 
-* Real-Time Messaging: Users should be able to send and receive messages in real time.
+* Real-Time Messaging: Users should be able to send and receive messages in **real-time**.
 
 * Message Encryption: Messages should be encrypted before being stored in the database and decrypted when retrieved to ensure privacy and security.
 
