@@ -3,41 +3,42 @@
 <head>
     <title>Chat Room - {{ chat_name }}</title>
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
+        const socket = io();
+
         function loadChat() {
             fetch('/get_messages/{{ chat_id }}')
                 .then(response => response.json())
                 .then(data => {
                     let chatArea = document.getElementById('chat-area');
                     chatArea.innerHTML = '';
-                    data.messages.forEach(message => {
-                        let messageElement = document.createElement('p');
-                        messageElement.textContent = message.message;
-                        if (message.sender === '{{ username }}') {
-                            messageElement.classList.add('sender');
-                        } else {
-                            messageElement.classList.add('receiver');
-                        }
-                        chatArea.appendChild(messageElement);
-                    });
+                    data.messages.forEach(addMessage);
                 });
+        }
+
+        function addMessage(msg) {
+            let chatArea = document.getElementById('chat-area');
+            let messageElement = document.createElement('p');
+            messageElement.textContent = msg.sender + ': ' + msg.message + ' (' + (msg.timestamp || '') + ')';
+            if (msg.sender === '{{ username }}') {
+                messageElement.classList.add('sender');
+            } else {
+                messageElement.classList.add('receiver');
+            }
+            chatArea.appendChild(messageElement);
+            chatArea.scrollTop = chatArea.scrollHeight;
         }
 
         function sendMessage() {
             let message = document.getElementById('message').value;
-            fetch('/send_message/{{ chat_id }}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ message: message })
-            }).then(response => response.json()).then(data => {
-                if (data.success) {
-                    document.getElementById('message').value = '';
-                    loadChat();
-                }
-            });
+            socket.emit('send_message', { chat_id: {{ chat_id }}, message: message });
+            document.getElementById('message').value = '';
         }
+
+        socket.on('receive_message', function(data) {
+            addMessage(data);
+        });
 
         function deleteChat() {
             fetch('/delete_chat/{{ chat_id }}', {
@@ -78,7 +79,7 @@
 
         window.onload = function() {
             loadChat();
-            setInterval(loadChat, 1000);
+            socket.emit('join', { chat_id: {{ chat_id }} });
         };
     </script>
 </head>
