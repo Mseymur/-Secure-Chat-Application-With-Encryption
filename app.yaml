@@ -1,5 +1,5 @@
 runtime: python38  # or python39, depending on your Python version
-entrypoint: gunicorn -b :$PORT app:app
+entrypoint: gunicorn -b :$PORT Chat:app
 
 handlers:
 - url: /static
