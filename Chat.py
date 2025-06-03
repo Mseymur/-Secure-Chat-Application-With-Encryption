@@ -57,7 +57,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Generate encryption key for encrypting messages
+# Generate encryption key used to encrypt and decrypt messages
 encryption_key = Fernet.generate_key()
 cipher = Fernet(encryption_key)
 
