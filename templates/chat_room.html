@@ -4,24 +4,104 @@
     <title>Chat Room - {{ chat_name }}</title>
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="chat-room-content"> <!-- Added wrapper for text-align and flex control -->
+            <header id="chat_name" style="margin-bottom: 10px;">{{ chat_name }}</header>
+
+            <div id="chat-name-change-panel" class="compact-form" style="margin-bottom: 10px;">
+                <input type="text" id="new_chat_name" placeholder="Enter new chat name...">
+                <button class="button primary" onclick="editChatName()">Change Name</button>
+                <button class="button danger" onclick="deleteChat()">Delete Chat</button> <!-- Changed to danger -->
+                <a href="{{ url_for('chat') }}" style="margin-left: auto;"><button class="button accent">Back to Chats</button></a>
+            </div>
+
+            <div class="encryption-key compact-form" style="margin-bottom: 10px;">
+                <label for="encryption-key" class="text-muted" style="margin-right:5px;">Key:</label>
+                <input type="password" id="encryption-key-input" value="{{ encryption_key }}" readonly title="Encryption Key"> <!-- Changed ID -->
+                <button id="toggle-key-btn" class="button secondary" onclick="toggleEncryptionKey()">Show Key</button> <!-- Changed ID & class -->
+                <button id="copy-key-btn" class="button secondary" onclick="copyEncryptionKey()">Copy Key</button>
+            </div>
+
+            <p class="text-muted" style="font-size:0.85em; margin-top: 5px; margin-bottom: 15px; text-align: center;">
+                <small>Share this key securely with the other user. Only those with the key can join this chat and decrypt messages.</small>
+            </p>
+
+            <div id="chat-area">
+                <!-- Messages will be loaded here -->
+            </div>
+
+            <div id="message-input-section" class="compact-form" style="margin-top: 10px;">
+                <input type="text" id="message" placeholder="Type your message here..." style="flex-grow:1; margin-right:10px;">
+                <button class="button primary" onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const socket = io();
+        const currentUsername = '{{ username }}';
+        const currentChatId = {{ chat_id }};
 
         function loadChat() {
-            fetch('/get_messages/{{ chat_id }}')
+            fetch(`/get_messages/${currentChatId}`)
                 .then(response => response.json())
                 .then(data => {
                     let chatArea = document.getElementById('chat-area');
-                    chatArea.innerHTML = '';
-                    data.messages.forEach(addMessage);
+                    chatArea.innerHTML = ''; // Clear existing messages
+                    if (data.messages && data.messages.length > 0) {
+                        data.messages.forEach(addMessage);
+                    } else {
+                        chatArea.innerHTML = '<p class="text-muted" style="text-align:center;">No messages yet. Start the conversation!</p>';
+                    }
+                })
+                .catch(error => {
+                    console.error("Error loading chat messages:", error);
+                    let chatArea = document.getElementById('chat-area');
+                    chatArea.innerHTML = '<p class="text-danger" style="text-align:center;">Could not load messages. Please try refreshing.</p>';
                 });
         }
 
         function addMessage(msg) {
             let chatArea = document.getElementById('chat-area');
             let messageElement = document.createElement('p');
-            messageElement.textContent = msg.sender + ': ' + msg.message + ' (' + (msg.timestamp || '') + ')';
-            if (msg.sender === '{{ username }}') {
+
+            let formattedTimestamp = '';
+            if (msg.timestamp) {
+                try {
+                    const date = new Date(msg.timestamp);
+                    if (!isNaN(date.getTime())) {
+                        formattedTimestamp = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                    } else {
+                        const parts = String(msg.timestamp).split(/[-T:.]/);
+                        if (parts.length >= 5) {
+                            const isoLike = `${parts[0]}-${parts[1]}-${parts[2]}T${parts[3]}:${parts[4]}:${parts[5] || '00'}`;
+                            const parsedDate = new Date(isoLike);
+                            if(!isNaN(parsedDate.getTime())){
+                                 formattedTimestamp = parsedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                            } else {
+                                 formattedTimestamp = String(msg.timestamp).substring(11,16);
+                            }
+                        } else {
+                            formattedTimestamp = String(msg.timestamp).substring(11,16);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Error parsing timestamp:", msg.timestamp, e);
+                    formattedTimestamp = String(msg.timestamp).substring(11,16);
+                }
+            }
+
+            const tempDiv = document.createElement('div');
+            tempDiv.textContent = msg.message; // Sanitize message content
+            const sanitizedMessage = tempDiv.innerHTML;
+
+            const senderName = msg.sender === currentUsername ? 'You' : msg.sender; // Display "You" for own messages
+
+            messageElement.innerHTML = `<strong>${senderName}:</strong> ${sanitizedMessage} <span class="text-muted" style="font-size: 0.8em; margin-left: 5px;">(${formattedTimestamp})</span>`;
+
+            if (msg.sender === currentUsername) {
                 messageElement.classList.add('sender');
             } else {
                 messageElement.classList.add('receiver');
@@ -31,28 +111,56 @@
         }
 
         function sendMessage() {
-            let message = document.getElementById('message').value;
-            socket.emit('send_message', { chat_id: {{ chat_id }}, message: message });
-            document.getElementById('message').value = '';
+            let messageInput = document.getElementById('message');
+            let sendButton = document.querySelector('#message-input-section button.primary');
+            let message = messageInput.value;
+
+            if (!message.trim()) return;
+
+            messageInput.disabled = true;
+            sendButton.disabled = true;
+            const originalButtonText = sendButton.textContent;
+            sendButton.textContent = 'Sending...';
+
+            socket.emit('send_message', { chat_id: currentChatId, message: message });
+
+            messageInput.value = '';
+
+            setTimeout(() => {
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+                sendButton.textContent = originalButtonText;
+                messageInput.focus(); // Refocus input
+            }, 700);
         }
 
         socket.on('receive_message', function(data) {
-            addMessage(data);
+            // Ensure message is for this chat room if server broadcasts to multiple rooms
+            if (data.chat_id === currentChatId) {
+                 addMessage(data);
+            }
         });
 
         function deleteChat() {
-            fetch('/delete_chat/{{ chat_id }}', {
-                method: 'POST'
-            }).then(response => response.json()).then(data => {
-                if (data.success) {
-                    window.location.href = "{{ url_for('chat') }}";
-                }
-            });
+            if (confirm("Are you sure you want to delete this chat? This action cannot be undone.")) {
+                fetch(`/delete_chat/${currentChatId}`, {
+                    method: 'POST'
+                }).then(response => response.json()).then(data => {
+                    if (data.success) {
+                        window.location.href = "{{ url_for('chat') }}";
+                    } else {
+                        alert("Failed to delete chat: " + (data.message || "Unknown error."));
+                    }
+                }).catch(error => {
+                    console.error("Error deleting chat:", error);
+                    alert("An error occurred while deleting the chat.");
+                });
+            }
         }
 
         function toggleEncryptionKey() {
-            const keyElement = document.getElementById('encryption-key');
-            const toggleButton = document.getElementById('toggle-key');
+            const keyElement = document.getElementById('encryption-key-input'); // Updated ID
+            const toggleButton = document.getElementById('toggle-key-btn'); // Updated ID
             if (keyElement.type === 'password') {
                 keyElement.type = 'text';
                 toggleButton.textContent = 'Hide Key';
@@ -62,45 +170,94 @@
             }
         }
 
+        function copyEncryptionKey() {
+            const keyElement = document.getElementById('encryption-key-input'); // Updated ID
+            const copyButton = document.getElementById('copy-key-btn');
+            const originalType = keyElement.type;
+
+            if (originalType === 'password') {
+                keyElement.type = 'text';
+            }
+
+            keyElement.select();
+            keyElement.setSelectionRange(0, 99999);
+
+            try {
+                navigator.clipboard.writeText(keyElement.value).then(() => {
+                    copyButton.textContent = 'Copied!';
+                    copyButton.classList.add('success');
+                    setTimeout(() => {
+                        copyButton.textContent = 'Copy Key';
+                        copyButton.classList.remove('success');
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Failed to copy key: ', err);
+                    copyButton.textContent = 'Error Copying';
+                     setTimeout(() => {
+                        copyButton.textContent = 'Copy Key';
+                    }, 2000);
+                });
+            } catch (err) {
+                 console.error('Error in copyEncryptionKey: ', err);
+                 alert('Failed to copy key. Please copy it manually.');
+            }
+
+            if (originalType === 'password') {
+                keyElement.type = 'password';
+            }
+            window.getSelection().removeAllRanges();
+        }
+
         function editChatName() {
-            const newChatName = document.getElementById('new_chat_name').value;
-            fetch('/edit_chat_name/{{ chat_id }}', {
+            const newChatNameInput = document.getElementById('new_chat_name');
+            const newChatName = newChatNameInput.value.trim();
+            if (!newChatName) {
+                alert("New chat name cannot be empty.");
+                return;
+            }
+            fetch(`/edit_chat_name/${currentChatId}`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ new_chat_name: newChatName })
             }).then(response => response.json()).then(data => {
                 if (data.success) {
                     document.getElementById('chat_name').textContent = newChatName;
+                    document.title = "Chat Room - " + newChatName; // Update page title
+                    newChatNameInput.value = ''; // Clear input
+                } else {
+                    alert("Failed to change chat name: " + (data.message || "Unknown error."));
                 }
+            }).catch(error => {
+                console.error("Error editing chat name:", error);
+                alert("An error occurred while changing the chat name.");
             });
         }
 
-        window.onload = function() {
+        document.addEventListener('DOMContentLoaded', (event) => {
             loadChat();
-            socket.emit('join', { chat_id: {{ chat_id }} });
-        };
+            socket.emit('join', { chat_id: currentChatId });
+
+            const messageInput = document.getElementById('message');
+            if (messageInput) {
+                messageInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendMessage();
+                    }
+                });
+            }
+
+            // Add event listener for chat name input as well
+            const chatNameInput = document.getElementById('new_chat_name');
+            if (chatNameInput) {
+                chatNameInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        editChatName();
+                    }
+                });
+            }
+        });
     </script>
-</head>
-<body>
-    <div class="container">
-        <header id="chat_name">{{ chat_name }}</header>
-        <div id="chat-name-change-panel">
-            <input type="text" id="new_chat_name" placeholder="Enter new chat name...">
-            <button class="primary" onclick="editChatName()">Change Name</button>
-            <button class="secondary" onclick="deleteChat()">Delete Chat</button>
-            <a href="{{ url_for('chat') }}"><button class="accent">Back to Chats</button></a>
-        </div>
-        <div id="chat-area"></div>
-        <div id="message-input-section">
-            <input type="text" id="message" placeholder="Type your message here...">
-            <button class="primary" onclick="sendMessage()">Send</button>
-        </div>
-        <div class="encryption-key">
-            <input type="password" id="encryption-key" value="{{ encryption_key }}" readonly>
-            <button id="toggle-key" class="primary" onclick="toggleEncryptionKey()">Show Key</button>
-        </div>
-    </div>
 </body>
 </html>

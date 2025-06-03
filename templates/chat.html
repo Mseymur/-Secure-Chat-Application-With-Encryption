@@ -7,11 +7,30 @@
         function showJoinForm() {
             document.getElementById('join-form').style.display = 'block';
             document.getElementById('create-form').style.display = 'none';
+            const mainContainer = document.querySelector('.container');
+            if (mainContainer) {
+                mainContainer.classList.add('form-active', 'join-form-active');
+                mainContainer.classList.remove('create-form-active');
+            }
         }
 
         function showCreateForm() {
             document.getElementById('join-form').style.display = 'none';
             document.getElementById('create-form').style.display = 'block';
+            const mainContainer = document.querySelector('.container');
+            if (mainContainer) {
+                mainContainer.classList.add('form-active', 'create-form-active');
+                mainContainer.classList.remove('join-form-active');
+            }
+        }
+
+        function hideForms() { // Optional: Function to hide all forms and remove classes
+            document.getElementById('join-form').style.display = 'none';
+            document.getElementById('create-form').style.display = 'none';
+            const mainContainer = document.querySelector('.container');
+            if (mainContainer) {
+                mainContainer.classList.remove('form-active', 'join-form-active', 'create-form-active');
+            }
         }
 
         function loadChats() {
@@ -19,52 +38,80 @@
                 .then(response => response.json())
                 .then(data => {
                     let chatList = document.getElementById('chat-list');
-                    chatList.innerHTML = '';
-                    data.chats.forEach(chat => {
-                        chatList.innerHTML += '<div class="chat-item"><a href="/chat_room/' + chat.chat_id + '">' + chat.chat_name + '</a></div>';
-                    });
+                    chatList.innerHTML = ''; // Clear existing list
+                    if (data.chats && data.chats.length > 0) {
+                        data.chats.forEach(chat => {
+                            // Ensure chat.chat_id and chat.chat_name are sanitized if they ever come from user input directly elsewhere
+                            // For now, assuming they are safe as they are generated server-side or from trusted sources
+                            chatList.innerHTML += `<div class="chat-item"><a href="/chat_room/${chat.chat_id}">${chat.chat_name}</a></div>`;
+                        });
+                    } else {
+                        chatList.innerHTML = '<p class="text-muted">No chats available. Create one!</p>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading chats:', error);
+                    let chatList = document.getElementById('chat-list');
+                    chatList.innerHTML = '<p class="text-muted">Could not load chats. Please try again later.</p>';
                 });
         }
 
         function deleteAllChats() {
-            fetch('/delete_all_chats', {
-                method: 'POST'
-            }).then(response => response.json()).then(data => {
-                if (data.success) {
-                    loadChats();
-                }
-            });
+            // Consider adding a confirmation dialog here for better UX
+            if (confirm("Are you sure you want to delete all chats? This action cannot be undone.")) {
+                fetch('/delete_all_chats', {
+                    method: 'POST'
+                }).then(response => response.json()).then(data => {
+                    if (data.success) {
+                        loadChats();
+                        hideForms(); // Hide forms after deleting chats
+                    } else {
+                        alert("Failed to delete chats: " + (data.message || "Unknown error"));
+                    }
+                }).catch(error => {
+                    console.error('Error deleting chats:', error);
+                    alert("An error occurred while deleting chats.");
+                });
+            }
         }
 
         window.onload = function() {
             loadChats();
+            // hideForms(); // Initially hide forms if needed, or set one as default visible.
         };
     </script>
 </head>
 <body>
     <div class="container">
-        <header>Chats</header>
-        <div id="chat-list"></div>
-        <br>
-        <button class="primary" onclick="showJoinForm()">Join Chat</button>
-        <button class="accent" onclick="showCreateForm()">Create Chat</button>
-        <button class="secondary" onclick="deleteAllChats()">Delete All Chats</button>
-        <div id="join-form" style="display:none;">
-            <form method="post" action="{{ url_for('chat') }}">
+        <header>Available Chats</header> <!-- Changed header text slightly -->
+        <div id="chat-list" style="width: 100%; margin-bottom: 20px;"></div> <!-- Ensured chat-list takes width and has margin -->
+
+        <div class="action-buttons" style="display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+            <button class="button primary" onclick="showJoinForm()">Join Chat</button>
+            <button class="button accent" onclick="showCreateForm()">Create Chat</button>
+            <button class="button danger" onclick="deleteAllChats()">Delete All Chats</button>
+        </div>
+
+        <div id="join-form" style="display:none; width:100%;" class="form-container">
+            <h2>Join Existing Chat</h2>
+            <form method="post" action="{{ url_for('chat') }}" style="display: flex; flex-direction: column; align-items: center;">
                 <input type="hidden" name="action" value="join">
-                <input type="text" name="encryption_key" placeholder="Encryption Key" required>
-                <button type="submit" class="primary">Join Chat</button>
+                <input type="text" name="encryption_key" placeholder="Enter Encryption Key" required style="width: 80%; max-width: 300px;">
+                <button type="submit" class="button primary" style="margin-top:10px;">Join Chat by Key</button>
             </form>
         </div>
-        <div id="create-form" style="display:none;">
-            <form method="post" action="{{ url_for('chat') }}">
+
+        <div id="create-form" style="display:none; width:100%;" class="form-container">
+            <h2>Create New Chat</h2>
+            <form method="post" action="{{ url_for('chat') }}" style="display: flex; flex-direction: column; align-items: center;">
                 <input type="hidden" name="action" value="create">
-                <input type="text" name="chat_name" placeholder="Chat Name" required>
-                <button type="submit" class="accent">Create Chat</button>
+                <input type="text" name="chat_name" placeholder="Enter New Chat Name" required style="width: 80%; max-width: 300px;">
+                <button type="submit" class="button accent" style="margin-top:10px;">Create New Chat</button>
             </form>
         </div>
-        <div>
-            <a href="{{ url_for('logout') }}"><button class="primary">Logout</button></a>
+
+        <div style="margin-top: 30px;"> <!-- Added more margin-top for spacing -->
+            <a href="{{ url_for('logout') }}"><button class="button secondary">Logout</button></a>
         </div>
     </div>
 </body>
