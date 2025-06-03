@@ -44,6 +44,15 @@
 <body>
     <div class="container">
         <header>Chats</header>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="flashes">
+            {% for category, message in messages %}
+              <div class="alert {{ category }}">{{ message }}</div>
+            {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
         <div id="chat-list"></div>
         <br>
         <button class="primary" onclick="showJoinForm()">Join Chat</button>
@@ -67,5 +76,10 @@
             <a href="{{ url_for('logout') }}"><button class="primary">Logout</button></a>
         </div>
     </div>
+    <script>
+        setTimeout(() => {
+            document.querySelectorAll('.alert').forEach(el => el.style.display = 'none');
+        }, 3000);
+    </script>
 </body>
 </html>

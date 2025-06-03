@@ -4,7 +4,7 @@ import string
 import base64
 from datetime import datetime
 from cryptography.fernet import Fernet
-from flask import Flask, request, render_template, redirect, url_for, session, jsonify
+from flask import Flask, request, render_template, redirect, url_for, session, jsonify, flash
 from flask_socketio import SocketIO, join_room, emit
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -91,9 +91,11 @@ def login():
         if user and check_password_hash(user[1], password):
             session['username'] = username
             session['user_id'] = user[0]
+            flash('Logged in successfully.', 'success')
             return redirect(url_for('chat'))
         else:
-            return "Invalid username or password."
+            flash('Invalid username or password.', 'error')
+            return redirect(url_for('login'))
     return render_template('login.html')
 
 # Route for sign up
@@ -111,11 +113,37 @@ def signup():
             cursor.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, hashed_password))
             conn.commit()
             conn.close()
+            flash('Account created successfully. Please log in.', 'success')
             return redirect(url_for('login'))
         except sqlite3.IntegrityError:
             conn.close()
-            return "Username already exists. Please choose another one."
+            flash('Username already exists. Please choose another one.', 'error')
+            return redirect(url_for('signup'))
     return render_template('signup.html')
+
+# Route for password reset
+@app.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        username = request.form['username']
+        new_password = request.form['new_password']
+
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute('SELECT id FROM users WHERE username = ?', (username,))
+        user = cursor.fetchone()
+        if user:
+            hashed_password = generate_password_hash(new_password)
+            cursor.execute('UPDATE users SET password = ? WHERE username = ?', (hashed_password, username))
+            conn.commit()
+            conn.close()
+            flash('Password updated. Please log in.', 'success')
+            return redirect(url_for('login'))
+        else:
+            conn.close()
+            flash('Username not found.', 'error')
+            return redirect(url_for('forgot_password'))
+    return render_template('forgot_password.html')
 
 # Route for chat
 @app.route('/chat', methods=['GET', 'POST'])

@@ -7,11 +7,25 @@
 <body>
     <div class="container">
         <header>Welcome to Secure Chat!</header>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="flashes">
+            {% for category, message in messages %}
+              <div class="alert {{ category }}">{{ message }}</div>
+            {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
         <p>Connect securely with your friends and colleagues.</p>
         <div>
             <a href="{{ url_for('login') }}"><button class="primary">Login</button></a>
             <a href="{{ url_for('signup') }}"><button class="accent">Sign Up</button></a>
         </div>
     </div>
+    <script>
+        setTimeout(() => {
+            document.querySelectorAll('.alert').forEach(el => el.style.display = 'none');
+        }, 3000);
+    </script>
 </body>
 </html>

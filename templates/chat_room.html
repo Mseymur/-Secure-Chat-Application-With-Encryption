@@ -86,6 +86,15 @@
 <body>
     <div class="container">
         <header id="chat_name">{{ chat_name }}</header>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="flashes">
+            {% for category, message in messages %}
+              <div class="alert {{ category }}">{{ message }}</div>
+            {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
         <div id="chat-name-change-panel">
             <input type="text" id="new_chat_name" placeholder="Enter new chat name...">
             <button class="primary" onclick="editChatName()">Change Name</button>
@@ -102,5 +111,10 @@
             <button id="toggle-key" class="primary" onclick="toggleEncryptionKey()">Show Key</button>
         </div>
     </div>
+    <script>
+        setTimeout(() => {
+            document.querySelectorAll('.alert').forEach(el => el.style.display = 'none');
+        }, 3000);
+    </script>
 </body>
 </html>

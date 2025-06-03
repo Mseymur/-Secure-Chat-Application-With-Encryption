@@ -171,4 +171,24 @@
     background-color: var(--bg-color);
     color: var(--text-color);
   }
+
+  /* Flash message styles */
+  .flashes {
+    margin-bottom: 10px;
+  }
+
+  .alert {
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 5px;
+    color: var(--text-color);
+  }
+
+  .alert.success {
+    background-color: var(--primary-color);
+  }
+
+  .alert.error {
+    background-color: var(--secondary-color);
+  }
   

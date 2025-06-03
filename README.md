@@ -65,6 +65,8 @@ pip install -r requirements.txt
 These pinned versions install Flask 3 and Werkzeug 3 to avoid the
 `ImportError: cannot import name 'url_quote'` that occurs with older
 Flask releases and newer Werkzeug.
+- Forgot password page lets users securely reset their password.
+- Flash messages and a dark themed interface improve overall UX.
 =======
 
 3. Run the application:
