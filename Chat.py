@@ -187,13 +187,30 @@ def send_message(chat_id):
     message = data['message']
     
     encrypted_message = base64.b64encode(cipher.encrypt(message.encode())).decode()
-    
+
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute('INSERT INTO messages (chat_id, sender_id, message) VALUES (?, ?, ?)', (chat_id, user_id, encrypted_message))
     conn.commit()
     conn.close()
-    
+
+    return jsonify(success=True)
+
+# Route to edit chat name
+@app.route('/edit_chat_name/<int:chat_id>', methods=['POST'])
+def edit_chat_name(chat_id):
+    if 'username' not in session:
+        return redirect(url_for('login'))
+
+    data = request.get_json()
+    new_chat_name = data.get('new_chat_name')
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('UPDATE chats SET chat_name = ? WHERE chat_id = ?', (new_chat_name, chat_id))
+    conn.commit()
+    conn.close()
+
     return jsonify(success=True)
 
 # Route to delete chat
