@@ -6,21 +6,25 @@
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 </head>
 <body>
+    <div id="socketStatusIndicator" class="socket-status-indicator">
+        <span id="socketStatusText">Connecting...</span>
+    </div>
+
     <div class="container">
-        <div class="chat-room-content"> <!-- Added wrapper for text-align and flex control -->
+        <div class="chat-room-content">
             <header id="chat_name" style="margin-bottom: 10px;">{{ chat_name }}</header>
 
             <div id="chat-name-change-panel" class="compact-form" style="margin-bottom: 10px;">
                 <input type="text" id="new_chat_name" placeholder="Enter new chat name...">
                 <button class="button primary" onclick="editChatName()">Change Name</button>
-                <button class="button danger" onclick="deleteChat()">Delete Chat</button> <!-- Changed to danger -->
+                <button class="button danger" onclick="deleteChat()">Delete Chat</button>
                 <a href="{{ url_for('chat') }}" style="margin-left: auto;"><button class="button accent">Back to Chats</button></a>
             </div>
 
             <div class="encryption-key compact-form" style="margin-bottom: 10px;">
-                <label for="encryption-key" class="text-muted" style="margin-right:5px;">Key:</label>
-                <input type="password" id="encryption-key-input" value="{{ encryption_key }}" readonly title="Encryption Key"> <!-- Changed ID -->
-                <button id="toggle-key-btn" class="button secondary" onclick="toggleEncryptionKey()">Show Key</button> <!-- Changed ID & class -->
+                <label for="encryption-key-input" class="text-muted" style="margin-right:5px;">Key:</label>
+                <input type="password" id="encryption-key-input" value="{{ encryption_key }}" readonly title="Encryption Key">
+                <button id="toggle-key-btn" class="button secondary" onclick="toggleEncryptionKey()">Show Key</button>
                 <button id="copy-key-btn" class="button secondary" onclick="copyEncryptionKey()">Copy Key</button>
             </div>
 
@@ -39,17 +43,128 @@
         </div>
     </div>
 
+    <div id="customModal" class="modal-backdrop" style="display:none;">
+        <div class="modal-content">
+            <h3 id="modalTitle" class="modal-title">Modal Title</h3>
+            <p id="modalMessage" class="modal-message">Modal message goes here.</p>
+            <div class="modal-buttons">
+                <button id="modalConfirmBtn" class="button primary">Confirm</button>
+                <button id="modalCancelBtn" class="button secondary">Cancel</button>
+                <button id="modalOkBtn" class="button primary">OK</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const socket = io();
         const currentUsername = '{{ username }}';
         const currentChatId = {{ chat_id }};
+
+        // --- Custom Modal Logic ---
+        const modalElement = document.getElementById('customModal');
+        const modalTitleElement = document.getElementById('modalTitle');
+        const modalMessageElement = document.getElementById('modalMessage');
+        const modalConfirmBtn = document.getElementById('modalConfirmBtn');
+        const modalCancelBtn = document.getElementById('modalCancelBtn');
+        const modalOkBtn = document.getElementById('modalOkBtn');
+
+        let confirmCallback = null;
+        let cancelCallback = null;
+
+        function showModal(title, message, type = 'alert', onConfirm, onCancel) {
+            modalTitleElement.textContent = title;
+            modalMessageElement.textContent = message;
+
+            modalConfirmBtn.style.display = 'none';
+            modalCancelBtn.style.display = 'none';
+            modalOkBtn.style.display = 'none';
+
+            const modalContentDiv = modalElement.querySelector('.modal-content');
+            modalContentDiv.classList.remove('error', 'success');
+
+            if (type === 'confirm') {
+                modalConfirmBtn.style.display = 'inline-block';
+                modalCancelBtn.style.display = 'inline-block';
+                confirmCallback = onConfirm;
+                cancelCallback = onCancel;
+            } else if (type === 'alert' || type === 'error' || type === 'success') {
+                modalOkBtn.style.display = 'inline-block';
+                confirmCallback = onConfirm;
+                 if (type === 'error') {
+                    modalContentDiv.classList.add('error');
+                } else if (type === 'success') {
+                    modalContentDiv.classList.add('success');
+                }
+            }
+            modalElement.classList.add('show');
+        }
+
+        function hideModal() {
+            modalElement.classList.remove('show');
+            confirmCallback = null;
+            cancelCallback = null;
+        }
+
+        modalConfirmBtn.addEventListener('click', () => {
+            if (typeof confirmCallback === 'function') {
+                confirmCallback();
+            }
+            hideModal();
+        });
+
+        modalCancelBtn.addEventListener('click', () => {
+            if (typeof cancelCallback === 'function') {
+                cancelCallback();
+            }
+            hideModal();
+        });
+
+        modalOkBtn.addEventListener('click', () => {
+            if (typeof confirmCallback === 'function') {
+                confirmCallback();
+            }
+            hideModal();
+        });
+
+        modalElement.addEventListener('click', (event) => {
+            if (event.target === modalElement) {
+                if (modalCancelBtn.style.display !== 'none' || modalOkBtn.style.display !== 'none') {
+                    if (typeof cancelCallback === 'function' && modalCancelBtn.style.display !== 'none') {
+                        cancelCallback();
+                    } else if (typeof confirmCallback === 'function' && modalOkBtn.style.display !== 'none') {
+                        confirmCallback();
+                    }
+                    hideModal();
+                }
+            }
+        });
+        // --- End Custom Modal Logic ---
+
+        // --- Socket Status Indicator Logic ---
+        let statusTimeout = null;
+        const socketStatusIndicator = document.getElementById('socketStatusIndicator');
+        const socketStatusText = document.getElementById('socketStatusText');
+
+        function updateSocketStatus(message, statusClass, persistent = false) {
+            if (!socketStatusIndicator || !socketStatusText) return;
+            clearTimeout(statusTimeout);
+            socketStatusText.textContent = message;
+            socketStatusIndicator.className = 'socket-status-indicator show ' + statusClass;
+            if (!persistent) {
+                statusTimeout = setTimeout(() => {
+                    socketStatusIndicator.classList.remove('show');
+                }, 3000);
+            }
+        }
+        // --- End Socket Status Indicator Logic ---
+
 
         function loadChat() {
             fetch(`/get_messages/${currentChatId}`)
                 .then(response => response.json())
                 .then(data => {
                     let chatArea = document.getElementById('chat-area');
-                    chatArea.innerHTML = ''; // Clear existing messages
+                    chatArea.innerHTML = '';
                     if (data.messages && data.messages.length > 0) {
                         data.messages.forEach(addMessage);
                     } else {
@@ -66,7 +181,6 @@
         function addMessage(msg) {
             let chatArea = document.getElementById('chat-area');
             let messageElement = document.createElement('p');
-
             let formattedTimestamp = '';
             if (msg.timestamp) {
                 try {
@@ -92,15 +206,11 @@
                     formattedTimestamp = String(msg.timestamp).substring(11,16);
                 }
             }
-
             const tempDiv = document.createElement('div');
-            tempDiv.textContent = msg.message; // Sanitize message content
+            tempDiv.textContent = msg.message;
             const sanitizedMessage = tempDiv.innerHTML;
-
-            const senderName = msg.sender === currentUsername ? 'You' : msg.sender; // Display "You" for own messages
-
+            const senderName = msg.sender === currentUsername ? 'You' : msg.sender;
             messageElement.innerHTML = `<strong>${senderName}:</strong> ${sanitizedMessage} <span class="text-muted" style="font-size: 0.8em; margin-left: 5px;">(${formattedTimestamp})</span>`;
-
             if (msg.sender === currentUsername) {
                 messageElement.classList.add('sender');
             } else {
@@ -119,48 +229,54 @@
 
             messageInput.disabled = true;
             sendButton.disabled = true;
-            const originalButtonText = sendButton.textContent;
+            if (!sendButton.dataset.originalText) { // Store original text if not already stored
+                sendButton.dataset.originalText = sendButton.textContent;
+            }
             sendButton.textContent = 'Sending...';
 
             socket.emit('send_message', { chat_id: currentChatId, message: message });
 
-            messageInput.value = '';
-
-            setTimeout(() => {
-                messageInput.disabled = false;
-                sendButton.disabled = false;
-                sendButton.textContent = originalButtonText;
-                messageInput.focus(); // Refocus input
-            }, 700);
+            messageInput.value = ''; // Clear input after emitting
+            // DO NOT re-enable here. This will be handled by receive_message or disconnect.
         }
 
         socket.on('receive_message', function(data) {
-            // Ensure message is for this chat room if server broadcasts to multiple rooms
             if (data.chat_id === currentChatId) {
                  addMessage(data);
+
+                 if (data.sender === currentUsername) {
+                    let messageInput = document.getElementById('message');
+                    let sendButton = document.querySelector('#message-input-section button.primary');
+                    if (messageInput.disabled) {
+                        messageInput.disabled = false;
+                        sendButton.disabled = false;
+                        sendButton.textContent = sendButton.dataset.originalText || 'Send';
+                        messageInput.focus();
+                    }
+                 }
             }
         });
 
         function deleteChat() {
-            if (confirm("Are you sure you want to delete this chat? This action cannot be undone.")) {
+            showModal('Confirm Delete', 'Are you sure you want to delete this chat? This action cannot be undone.', 'confirm', () => {
                 fetch(`/delete_chat/${currentChatId}`, {
                     method: 'POST'
                 }).then(response => response.json()).then(data => {
                     if (data.success) {
                         window.location.href = "{{ url_for('chat') }}";
                     } else {
-                        alert("Failed to delete chat: " + (data.message || "Unknown error."));
+                        showModal('Error', "Failed to delete chat: " + (data.message || "Unknown error."), 'error');
                     }
                 }).catch(error => {
                     console.error("Error deleting chat:", error);
-                    alert("An error occurred while deleting the chat.");
+                    showModal('Error', "An error occurred while deleting the chat.", 'error');
                 });
-            }
+            });
         }
 
         function toggleEncryptionKey() {
-            const keyElement = document.getElementById('encryption-key-input'); // Updated ID
-            const toggleButton = document.getElementById('toggle-key-btn'); // Updated ID
+            const keyElement = document.getElementById('encryption-key-input');
+            const toggleButton = document.getElementById('toggle-key-btn');
             if (keyElement.type === 'password') {
                 keyElement.type = 'text';
                 toggleButton.textContent = 'Hide Key';
@@ -171,27 +287,24 @@
         }
 
         function copyEncryptionKey() {
-            const keyElement = document.getElementById('encryption-key-input'); // Updated ID
+            const keyElement = document.getElementById('encryption-key-input');
             const copyButton = document.getElementById('copy-key-btn');
             const originalType = keyElement.type;
-
             if (originalType === 'password') {
                 keyElement.type = 'text';
             }
-
             keyElement.select();
             keyElement.setSelectionRange(0, 99999);
-
             try {
                 navigator.clipboard.writeText(keyElement.value).then(() => {
                     copyButton.textContent = 'Copied!';
-                    copyButton.classList.add('success');
+                    showModal('Success', 'Encryption key copied to clipboard!', 'success');
                     setTimeout(() => {
                         copyButton.textContent = 'Copy Key';
-                        copyButton.classList.remove('success');
                     }, 2000);
                 }).catch(err => {
                     console.error('Failed to copy key: ', err);
+                    showModal('Copy Error', 'Failed to copy key. Please try again or copy manually.', 'error');
                     copyButton.textContent = 'Error Copying';
                      setTimeout(() => {
                         copyButton.textContent = 'Copy Key';
@@ -199,9 +312,8 @@
                 });
             } catch (err) {
                  console.error('Error in copyEncryptionKey: ', err);
-                 alert('Failed to copy key. Please copy it manually.');
+                 showModal('Copy Error', 'Failed to copy key. Please copy it manually.', 'error');
             }
-
             if (originalType === 'password') {
                 keyElement.type = 'password';
             }
@@ -212,7 +324,7 @@
             const newChatNameInput = document.getElementById('new_chat_name');
             const newChatName = newChatNameInput.value.trim();
             if (!newChatName) {
-                alert("New chat name cannot be empty.");
+                showModal('Validation Error', 'New chat name cannot be empty.', 'error');
                 return;
             }
             fetch(`/edit_chat_name/${currentChatId}`, {
@@ -222,20 +334,64 @@
             }).then(response => response.json()).then(data => {
                 if (data.success) {
                     document.getElementById('chat_name').textContent = newChatName;
-                    document.title = "Chat Room - " + newChatName; // Update page title
-                    newChatNameInput.value = ''; // Clear input
+                    document.title = "Chat Room - " + newChatName;
+                    newChatNameInput.value = '';
+                    showModal('Success', 'Chat name updated successfully!', 'success');
                 } else {
-                    alert("Failed to change chat name: " + (data.message || "Unknown error."));
+                    showModal('Error', "Failed to change chat name: " + (data.message || "Unknown error."), 'error');
                 }
             }).catch(error => {
                 console.error("Error editing chat name:", error);
-                alert("An error occurred while changing the chat name.");
+                showModal('Error', "An error occurred while changing the chat name.", 'error');
             });
         }
+
+        // Socket.IO connection status listeners
+        socket.on('connect', () => {
+            updateSocketStatus('Connected', 'connected');
+        });
+
+        socket.on('disconnect', (reason) => {
+            updateSocketStatus('Connection lost. Attempting to reconnect...', 'disconnected', true);
+
+            let messageInput = document.getElementById('message');
+            let sendButton = document.querySelector('#message-input-section button.primary');
+
+            if (sendButton.disabled && sendButton.textContent === 'Sending...') {
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+                sendButton.textContent = sendButton.dataset.originalText || 'Send';
+
+                showModal(
+                    'Connection Issue',
+                    'Connection lost. Your last message might not have been sent. Please verify and resend if necessary.',
+                    'error'
+                );
+            }
+        });
+
+        socket.on('reconnecting', (attemptNumber) => {
+            updateSocketStatus(`Reconnecting (attempt ${attemptNumber})...`, 'reconnecting', true);
+        });
+        socket.on('reconnect', (attemptNumber) => {
+            updateSocketStatus('Reconnected successfully!', 'connected');
+             // If a message was partially typed, it will still be in the input. User can retry sending.
+        });
+        socket.on('connect_error', (error) => {
+            updateSocketStatus('Failed to connect. Check network.', 'disconnected', true);
+        });
+        socket.on('reconnect_failed', () => {
+            updateSocketStatus('Could not reconnect. Please refresh.', 'disconnected', true);
+        });
+
 
         document.addEventListener('DOMContentLoaded', (event) => {
             loadChat();
             socket.emit('join', { chat_id: currentChatId });
+
+            if (socket && !socket.connected) {
+                 updateSocketStatus('Connecting...', 'reconnecting', true);
+            }
 
             const messageInput = document.getElementById('message');
             if (messageInput) {
@@ -246,8 +402,6 @@
                     }
                 });
             }
-
-            // Add event listener for chat name input as well
             const chatNameInput = document.getElementById('new_chat_name');
             if (chatNameInput) {
                 chatNameInput.addEventListener('keypress', function(e) {

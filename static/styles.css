@@ -341,3 +341,119 @@
   .align-items-center { align-items: center !important; }
   .justify-content-center { justify-content: center !important; }
   .justify-content-between { justify-content: space-between !important; }
+
+  /* Form Error Message Styling */
+  .form-error-message {
+    color: var(--error-color, #dc3545); /* Fallback error color */
+    background-color: rgba(220, 53, 69, 0.1); /* Light red background */
+    padding: 12px 15px;
+    border-radius: 6px; /* Consistent with input fields */
+    margin-bottom: 15px; /* Space below the message */
+    border: 1px solid var(--error-color, #dc3545);
+    text-align: center; /* Center the text */
+    font-size: 0.9em;
+  }
+
+  /* Modal Styles */
+  .modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6); /* Semi-transparent dark backdrop */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000; /* Ensure it's on top */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+  }
+
+  .modal-backdrop.show {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.3s ease;
+  }
+
+  .modal-content {
+    background-color: var(--surface-color, #2b2b2b);
+    color: var(--text-color, #f8f9fa);
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    width: 90%;
+    max-width: 450px; /* Max width for the modal */
+    text-align: center;
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+  }
+
+  .modal-backdrop.show .modal-content {
+    transform: scale(1);
+  }
+
+  .modal-title {
+    color: var(--primary-color, #007bff);
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.4em;
+  }
+
+  .modal-message {
+    margin-bottom: 25px;
+    font-size: 1em;
+    line-height: 1.6;
+  }
+
+  .modal-buttons button {
+    margin: 0 10px;
+    min-width: 100px;
+  }
+
+  /* Specific button styling if needed, e.g., for error modals */
+  .modal-content.error .modal-title {
+    color: var(--error-color, #dc3545);
+  }
+  .modal-content.success .modal-title {
+    color: var(--success-color, #28a745);
+  }
+
+/* Socket Status Indicator Styles */
+.socket-status-indicator {
+    padding: 8px 15px;
+    font-size: 0.85em;
+    text-align: center;
+    border-radius: 0 0 6px 6px; /* Rounded bottom corners if at top */
+    position: fixed; /* Or absolute if container is relative */
+    top: 0; /* Adjust if you have a navbar */
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1001; /* Above modal backdrop if necessary, or adjust */
+    min-width: 200px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    display: none; /* Initially hidden, shown by JS */
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out, top 0.5s ease-in-out; /* Smooth appearance */
+}
+
+.socket-status-indicator.show {
+    display: block; /* Changed to block for proper layout */
+    opacity: 0.9;
+}
+
+.socket-status-indicator.connected {
+    background-color: var(--success-color, #28a745);
+    color: white;
+}
+
+.socket-status-indicator.disconnected {
+    background-color: var(--error-color, #dc3545);
+    color: white;
+}
+
+.socket-status-indicator.reconnecting {
+    background-color: var(--accent-color, #17a2b8); /* Or a warning yellow */
+    color: white;
+}
