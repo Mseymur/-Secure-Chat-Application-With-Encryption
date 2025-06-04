@@ -100,7 +100,8 @@ def login():
             session['user_id'] = user[0]
             return redirect(url_for('chat'))
         else:
-            return "Invalid username or password."
+            # return "Invalid username or password."
+            return render_template('login.html', error="Invalid username or password.")
     return render_template('login.html')
 
 # Route for sign up
@@ -121,7 +122,8 @@ def signup():
             return redirect(url_for('login'))
         except sqlite3.IntegrityError:
             conn.close()
-            return "Username already exists. Please choose another one."
+            # return "Username already exists. Please choose another one."
+            return render_template('signup.html', error="Username already exists. Please choose another one.")
     return render_template('signup.html')
 
 # Route for chat
@@ -136,7 +138,9 @@ def chat():
         action = request.form['action']
         if action == 'create':
             encryption_key = Fernet.generate_key().decode()
-            chat_name = request.form['chat_name']
+            chat_name = request.form.get('chat_name', 'New Chat') # Default chat name if not provided
+            if not chat_name.strip(): # Ensure chat name is not just whitespace
+                chat_name = "New Chat"
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
             cursor.execute('INSERT INTO chats (encryption_key, chat_name, user1_id) VALUES (?, ?, ?)', (encryption_key, chat_name, user_id))
@@ -149,23 +153,28 @@ def chat():
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
             cursor.execute('SELECT chat_id, user1_id, user2_id FROM chats WHERE encryption_key = ?', (encryption_key,))
-            chat_data = cursor.fetchone() # Renamed to avoid conflict with function name
+            chat_data = cursor.fetchone()
             if chat_data:
-                if chat_data[2] is None or chat_data[2] == user_id or chat_data[1] == user_id : # Allow if user2 is null or current user is user1 or user2
-                    if chat_data[2] is None and chat_data[1] != user_id: # If user2 is null and current user is not user1, set user2
-                        cursor.execute('UPDATE chats SET user2_id = ? WHERE encryption_key = ?', (user_id, encryption_key))
-                        conn.commit()
-                    chat_id = chat_data[0]
+                chat_id_val, user1_id_val, user2_id_val = chat_data
+                # Allow if user is already part of the chat or if there's space
+                if user_id == user1_id_val or user_id == user2_id_val:
                     conn.close()
-                    return redirect(url_for('chat_room', chat_id=chat_id))
-                else: # user2 is set and is not the current user, and current user is not user1
+                    return redirect(url_for('chat_room', chat_id=chat_id_val))
+                elif user2_id_val is None: # If user2 is null and current user is not user1 (already checked), set user2
+                    cursor.execute('UPDATE chats SET user2_id = ? WHERE encryption_key = ?', (user_id, encryption_key))
+                    conn.commit()
                     conn.close()
-                    return "Chat is already full or you are not part of this chat."
+                    return redirect(url_for('chat_room', chat_id=chat_id_val))
+                else:
+                    conn.close()
+                    return render_template('chat.html', join_error="Chat is already full.", encryption_key_value=encryption_key, show_join_form=True)
             else:
                 conn.close()
-                return "Invalid encryption key."
+                return render_template('chat.html', join_error="Invalid encryption key.", encryption_key_value=encryption_key, show_join_form=True)
 
-    return render_template('chat.html')
+    # For GET request, or if POST is not 'create' or 'join' (though current logic doesn't lead here)
+    return render_template('chat.html', join_error=None, encryption_key_value=None, show_join_form=False)
+
 
 # Route to get chat messages
 @app.route('/get_messages/<int:chat_id>', methods=['GET'])
@@ -177,10 +186,10 @@ def get_messages(chat_id):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute('SELECT user1_id, user2_id, encryption_key FROM chats WHERE chat_id = ?', (chat_id,))
-    chat_data = cursor.fetchone() # Renamed
-    if not chat_data or user_id not in (chat_data[0], chat_data[1]): # Check if user is part of the chat
+    chat_data = cursor.fetchone()
+    if not chat_data or user_id not in (chat_data[0], chat_data[1]):
         conn.close()
-        return jsonify(messages=[]) # Return empty if not part of chat
+        return jsonify(messages=[])
     encryption_key = chat_data[2]
     cursor.execute('''
         SELECT messages.message, messages.timestamp, users.username
@@ -199,8 +208,7 @@ def get_messages(chat_id):
             decrypted_message = cipher.decrypt(base64.b64decode(msg[0])).decode()
             decrypted_messages.append({'sender': msg[2], 'message': decrypted_message, 'timestamp': msg[1]})
         except Exception as e:
-            print(f"Error decrypting message: {e}") # Log error
-            # Optionally, send a placeholder for undecryptable messages
+            print(f"Error decrypting message: {e}")
             decrypted_messages.append({'sender': msg[2], 'message': '[Undecryptable Message]', 'timestamp': msg[1]})
 
 
@@ -219,8 +227,8 @@ def send_message(chat_id):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute('SELECT user1_id, user2_id, encryption_key FROM chats WHERE chat_id = ?', (chat_id,))
-    chat_data = cursor.fetchone() # Renamed
-    if not chat_data or user_id not in (chat_data[0], chat_data[1]): # Check if user is part of the chat
+    chat_data = cursor.fetchone()
+    if not chat_data or user_id not in (chat_data[0], chat_data[1]):
         conn.close()
         return jsonify(success=False, error="User not part of chat")
     encryption_key = chat_data[2]
@@ -250,8 +258,8 @@ def edit_chat_name(chat_id):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute('SELECT user1_id, user2_id FROM chats WHERE chat_id = ?', (chat_id,))
-    chat_data = cursor.fetchone() # Renamed
-    if not chat_data or user_id not in (chat_data[0], chat_data[1]): # Check if user is part of the chat
+    chat_data = cursor.fetchone()
+    if not chat_data or user_id not in (chat_data[0], chat_data[1]):
         conn.close()
         return jsonify(success=False, error="User not part of chat")
     cursor.execute('UPDATE chats SET chat_name = ? WHERE chat_id = ?', (new_name, chat_id))
@@ -265,10 +273,9 @@ def delete_chat(chat_id):
     if 'username' not in session:
         return redirect(url_for('login'))
 
-    user_id = session['user_id'] # Get current user's ID
+    user_id = session['user_id']
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    # Verify that the current user is part of the chat they are trying to delete
     cursor.execute('SELECT user1_id, user2_id FROM chats WHERE chat_id = ?', (chat_id,))
     chat_data = cursor.fetchone()
     if not chat_data or user_id not in (chat_data[0], chat_data[1]):
@@ -285,20 +292,14 @@ def delete_chat(chat_id):
 # Route to delete all chats
 @app.route('/delete_all_chats', methods=['POST'])
 def delete_all_chats():
-    if 'username' not in session: # Basic auth check
+    if 'username' not in session:
         return jsonify(success=False, error="Unauthorized"), 401
-
-    # More robust: ensure only an admin or based on specific logic can do this
-    # For now, any logged-in user can delete all chats, which is DANGEROUS.
-    # This should be restricted in a real application.
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     try:
         cursor.execute('DELETE FROM messages')
         cursor.execute('DELETE FROM chats')
-        # If using foreign key constraints with ON DELETE CASCADE, messages might be deleted automatically
-        # Re-check if users should be deleted or if this is just about chat content
         conn.commit()
         success = True
         message = "All chats and messages have been deleted."
@@ -323,16 +324,14 @@ def chat_room(chat_id):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute('SELECT chat_name, encryption_key, user1_id, user2_id FROM chats WHERE chat_id = ?', (chat_id,))
-    chat_data = cursor.fetchone() # Renamed
+    chat_data = cursor.fetchone()
 
     if not chat_data:
         conn.close()
         return "Chat not found.", 404
 
-    # Ensure the current user is part of this chat
     if user_id not in (chat_data[2], chat_data[3]):
         conn.close()
-        # Instead of just "Chat not found", give a more specific message or redirect
         return "You are not a participant in this chat.", 403
 
 
@@ -360,22 +359,20 @@ def get_chats():
 @socketio.on('join')
 def handle_join(data):
     chat_id = data.get('chat_id')
-    user_id = session.get('user_id') # Use session.get to avoid KeyError if user_id is not in session
+    user_id = session.get('user_id')
     if not user_id:
-        emit('status', {'msg': 'Authentication error: User not logged in.'}, room=request.sid) # Emit to specific client
+        emit('status', {'msg': 'Authentication error: User not logged in.'}, room=request.sid)
         return
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute('SELECT user1_id, user2_id FROM chats WHERE chat_id = ?', (chat_id,))
-    chat_data = cursor.fetchone() # Renamed
+    chat_data = cursor.fetchone()
     conn.close()
-    # Ensure user is part of the chat before joining the room
     if chat_data and user_id in (chat_data[0], chat_data[1]):
         join_room(str(chat_id))
-        emit('status', {'msg': session.get('username', 'A user') + ' has joined the room.'}, room=str(chat_id)) # More informative
+        emit('status', {'msg': session.get('username', 'A user') + ' has joined the room.'}, room=str(chat_id))
     else:
-        # Optionally emit an error/status message back to the user
         emit('status', {'msg': 'Error joining room or not authorized.'}, room=request.sid)
 
 
@@ -383,21 +380,20 @@ def handle_join(data):
 def handle_socket_message(data):
     chat_id = data.get('chat_id')
     message = data.get('message')
-    user_id = session.get('user_id') # Use session.get
+    user_id = session.get('user_id')
     if not user_id:
-        # Handle case where user is not logged in or session expired
         emit('status', {'msg': 'Authentication error. Cannot send message.'}, room=request.sid)
         return
 
-    if not message or len(message.strip()) == 0: # Prevent empty messages
+    if not message or len(message.strip()) == 0:
         return
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute('SELECT user1_id, user2_id, encryption_key FROM chats WHERE chat_id = ?', (chat_id,))
-    chat_data = cursor.fetchone() # Renamed
+    chat_data = cursor.fetchone()
 
-    if not chat_data or user_id not in (chat_data[0], chat_data[1]): # Ensure user is part of chat
+    if not chat_data or user_id not in (chat_data[0], chat_data[1]):
         conn.close()
         emit('status', {'msg': 'Cannot send message: Not part of this chat or chat does not exist.'}, room=request.sid)
         return
@@ -424,10 +420,9 @@ def handle_socket_message(data):
         conn.close()
         return
 
-    sender_name = session.get('username', 'Unknown User') # Get username from session
-    conn.close() # Close connection after DB operations
+    sender_name = session.get('username', 'Unknown User')
+    conn.close()
 
-    # Emit to all users in the room, including sender for confirmation
     emit('receive_message', {'sender': sender_name, 'message': message, 'timestamp': timestamp, 'chat_id': chat_id}, room=str(chat_id))
 
 
@@ -440,5 +435,4 @@ def logout():
 
 if __name__ == '__main__':
     init_db()
-    # Consider security implications of debug=True in anything resembling a production environment
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)
