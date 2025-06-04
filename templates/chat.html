@@ -3,6 +3,13 @@
 <head>
     <title>Chats</title>
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        /* Adding a simple active class for buttons, can be enhanced in main CSS */
+        .action-buttons .button.active {
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+            filter: brightness(90%);
+        }
+    </style>
     <script>
         function showJoinForm() {
             document.getElementById('join-form').style.display = 'block';
@@ -12,6 +19,11 @@
                 mainContainer.classList.add('form-active', 'join-form-active');
                 mainContainer.classList.remove('create-form-active');
             }
+            // Button active state
+            const joinBtn = document.getElementById('join-form-btn');
+            const createBtn = document.getElementById('create-form-btn');
+            if(joinBtn) joinBtn.classList.add('active');
+            if(createBtn) createBtn.classList.remove('active');
         }
 
         function showCreateForm() {
@@ -22,15 +34,25 @@
                 mainContainer.classList.add('form-active', 'create-form-active');
                 mainContainer.classList.remove('join-form-active');
             }
+            // Button active state
+            const joinBtn = document.getElementById('join-form-btn');
+            const createBtn = document.getElementById('create-form-btn');
+            if(joinBtn) joinBtn.classList.remove('active');
+            if(createBtn) createBtn.classList.add('active');
         }
 
-        function hideForms() { // Optional: Function to hide all forms and remove classes
+        function hideForms() {
             document.getElementById('join-form').style.display = 'none';
             document.getElementById('create-form').style.display = 'none';
             const mainContainer = document.querySelector('.container');
             if (mainContainer) {
                 mainContainer.classList.remove('form-active', 'join-form-active', 'create-form-active');
             }
+             // Button active state
+            const joinBtn = document.getElementById('join-form-btn');
+            const createBtn = document.getElementById('create-form-btn');
+            if(joinBtn) joinBtn.classList.remove('active');
+            if(createBtn) createBtn.classList.remove('active');
         }
 
         function loadChats() {
@@ -38,81 +60,164 @@
                 .then(response => response.json())
                 .then(data => {
                     let chatList = document.getElementById('chat-list');
-                    chatList.innerHTML = ''; // Clear existing list
+                    chatList.innerHTML = '';
                     if (data.chats && data.chats.length > 0) {
                         data.chats.forEach(chat => {
-                            // Ensure chat.chat_id and chat.chat_name are sanitized if they ever come from user input directly elsewhere
-                            // For now, assuming they are safe as they are generated server-side or from trusted sources
                             chatList.innerHTML += `<div class="chat-item"><a href="/chat_room/${chat.chat_id}">${chat.chat_name}</a></div>`;
                         });
                     } else {
-                        chatList.innerHTML = '<p class="text-muted">No chats available. Create one!</p>';
+                        chatList.innerHTML = '<p class="text-muted" style="padding: 10px 0;">No chats available. Create one!</p>';
                     }
                 })
                 .catch(error => {
                     console.error('Error loading chats:', error);
                     let chatList = document.getElementById('chat-list');
-                    chatList.innerHTML = '<p class="text-muted">Could not load chats. Please try again later.</p>';
+                    chatList.innerHTML = '<p class="text-muted" style="padding: 10px 0;">Could not load chats. Please try again later.</p>';
+                    if (typeof showModal === 'function') showModal('Error', 'Could not load chats. Please check your connection or try refreshing.', 'error');
                 });
         }
-
-        function deleteAllChats() {
-            // Consider adding a confirmation dialog here for better UX
-            if (confirm("Are you sure you want to delete all chats? This action cannot be undone.")) {
-                fetch('/delete_all_chats', {
-                    method: 'POST'
-                }).then(response => response.json()).then(data => {
-                    if (data.success) {
-                        loadChats();
-                        hideForms(); // Hide forms after deleting chats
-                    } else {
-                        alert("Failed to delete chats: " + (data.message || "Unknown error"));
-                    }
-                }).catch(error => {
-                    console.error('Error deleting chats:', error);
-                    alert("An error occurred while deleting chats.");
-                });
-            }
-        }
-
-        window.onload = function() {
-            loadChats();
-            // hideForms(); // Initially hide forms if needed, or set one as default visible.
-        };
     </script>
 </head>
 <body>
     <div class="container">
-        <header>Available Chats</header> <!-- Changed header text slightly -->
-        <div id="chat-list" style="width: 100%; margin-bottom: 20px;"></div> <!-- Ensured chat-list takes width and has margin -->
+        <header>Available Chats</header>
+        <p style="text-align:center; margin-bottom:20px; color: var(--text-muted-color);">
+            Manage your secure chats, create new ones, or join existing conversations using an encryption key.
+        </p>
+        <div id="chat-list" style="width: 100%; margin-bottom: 20px;"></div>
 
         <div class="action-buttons" style="display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
-            <button class="button primary" onclick="showJoinForm()">Join Chat</button>
-            <button class="button accent" onclick="showCreateForm()">Create Chat</button>
+            <button id="join-form-btn" class="button primary" onclick="showJoinForm()">Join Chat</button>
+            <button id="create-form-btn" class="button accent" onclick="showCreateForm()">Create Chat</button>
             <button class="button danger" onclick="deleteAllChats()">Delete All Chats</button>
         </div>
 
         <div id="join-form" style="display:none; width:100%;" class="form-container">
             <h2>Join Existing Chat</h2>
+            <p class="text-muted" style="font-size:0.9em; margin-bottom:10px; text-align:left;">
+                Enter the unique encryption key shared by the chat creator to join an existing chat.
+            </p>
             <form method="post" action="{{ url_for('chat') }}" style="display: flex; flex-direction: column; align-items: center;">
                 <input type="hidden" name="action" value="join">
-                <input type="text" name="encryption_key" placeholder="Enter Encryption Key" required style="width: 80%; max-width: 300px;">
-                <button type="submit" class="button primary" style="margin-top:10px;">Join Chat by Key</button>
+                {% if join_error %}
+                    <div class="form-error-message">
+                        {{ join_error }}
+                    </div>
+                {% endif %}
+                <input type="text" name="encryption_key" placeholder="Enter Encryption Key" required style="width: 100%; max-width: 350px;" value="{{ encryption_key_value if encryption_key_value else '' }}">
+                <button type="submit" class="button primary" style="margin-top:15px;">Join Chat by Key</button>
             </form>
         </div>
 
         <div id="create-form" style="display:none; width:100%;" class="form-container">
             <h2>Create New Chat</h2>
+            <p class="text-muted" style="font-size:0.9em; margin-bottom:10px; text-align:left;">
+                Give your new chat a name. A unique encryption key will be generated for you to share once the chat is created (visible in the chat room).
+            </p>
             <form method="post" action="{{ url_for('chat') }}" style="display: flex; flex-direction: column; align-items: center;">
                 <input type="hidden" name="action" value="create">
-                <input type="text" name="chat_name" placeholder="Enter New Chat Name" required style="width: 80%; max-width: 300px;">
-                <button type="submit" class="button accent" style="margin-top:10px;">Create New Chat</button>
+                <input type="text" name="chat_name" placeholder="Enter New Chat Name" required style="width: 100%; max-width: 350px;">
+                <button type="submit" class="button accent" style="margin-top:15px;">Create New Chat</button>
             </form>
         </div>
 
-        <div style="margin-top: 30px;"> <!-- Added more margin-top for spacing -->
+        <div style="margin-top: 30px;">
             <a href="{{ url_for('logout') }}"><button class="button secondary">Logout</button></a>
         </div>
     </div>
+
+    <div id="customModal" class="modal-backdrop" style="display:none;">
+        <div class="modal-content">
+            <h3 id="modalTitle" class="modal-title">Modal Title</h3>
+            <p id="modalMessage" class="modal-message">Modal message goes here.</p>
+            <div class="modal-buttons">
+                <button id="modalConfirmBtn" class="button primary">Confirm</button>
+                <button id="modalCancelBtn" class="button secondary">Cancel</button>
+                <button id="modalOkBtn" class="button primary">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Custom Modal Logic (from previous step) ---
+        const modalElement = document.getElementById('customModal');
+        const modalTitleElement = document.getElementById('modalTitle');
+        const modalMessageElement = document.getElementById('modalMessage');
+        const modalConfirmBtn = document.getElementById('modalConfirmBtn');
+        const modalCancelBtn = document.getElementById('modalCancelBtn');
+        const modalOkBtn = document.getElementById('modalOkBtn');
+        let confirmCallback = null;
+        let cancelCallback = null;
+
+        function showModal(title, message, type = 'alert', onConfirm, onCancel) {
+            modalTitleElement.textContent = title;
+            modalMessageElement.textContent = message;
+            modalConfirmBtn.style.display = 'none';
+            modalCancelBtn.style.display = 'none';
+            modalOkBtn.style.display = 'none';
+            const modalContentDiv = modalElement.querySelector('.modal-content');
+            modalContentDiv.classList.remove('error', 'success');
+            if (type === 'confirm') {
+                modalConfirmBtn.style.display = 'inline-block';
+                modalCancelBtn.style.display = 'inline-block';
+                confirmCallback = onConfirm;
+                cancelCallback = onCancel;
+            } else if (type === 'alert' || type === 'error' || type === 'success') {
+                modalOkBtn.style.display = 'inline-block';
+                confirmCallback = onConfirm;
+                 if (type === 'error') modalContentDiv.classList.add('error');
+                 else if (type === 'success') modalContentDiv.classList.add('success');
+            }
+            modalElement.classList.add('show');
+        }
+
+        function hideModal() {
+            modalElement.classList.remove('show');
+            confirmCallback = null;
+            cancelCallback = null;
+        }
+        modalConfirmBtn.addEventListener('click', () => { if (typeof confirmCallback === 'function') confirmCallback(); hideModal(); });
+        modalCancelBtn.addEventListener('click', () => { if (typeof cancelCallback === 'function') cancelCallback(); hideModal(); });
+        modalOkBtn.addEventListener('click', () => { if (typeof confirmCallback === 'function') confirmCallback(); hideModal(); });
+        modalElement.addEventListener('click', (event) => {
+            if (event.target === modalElement) {
+                if (modalCancelBtn.style.display !== 'none' || modalOkBtn.style.display !== 'none') {
+                    if (typeof cancelCallback === 'function' && modalCancelBtn.style.display !== 'none') cancelCallback();
+                    else if (typeof confirmCallback === 'function' && modalOkBtn.style.display !== 'none') confirmCallback();
+                    hideModal();
+                }
+            }
+        });
+        // --- End Custom Modal Logic ---
+
+        function deleteAllChats() {
+            showModal('Confirm Delete All', 'Are you sure you want to delete all your chats? This action cannot be undone.', 'confirm', () => {
+                fetch('/delete_all_chats', {
+                    method: 'POST'
+                }).then(response => response.json()).then(data => {
+                    if (data.success) {
+                        loadChats(); // Reload chat list
+                        hideForms(); // Hide any open forms
+                        showModal('Success', data.message || 'All chats deleted successfully.', 'success');
+                    } else {
+                        showModal('Error', "Failed to delete chats: " + (data.message || "Unknown error."), 'error');
+                    }
+                }).catch(error => {
+                    console.error('Error deleting chats:', error);
+                    showModal('Error', "An error occurred while deleting chats.", 'error');
+                });
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initial setup calls
+            loadChats();
+            hideForms(); // Start with forms hidden, unless an error needs to show one
+
+            {% if show_join_form and join_error %}
+                showJoinForm();
+            {% endif %}
+        });
+    </script>
 </body>
 </html>

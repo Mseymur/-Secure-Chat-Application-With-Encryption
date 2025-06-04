@@ -7,6 +7,11 @@
 <body>
     <div class="container">
         <header>Sign Up</header>
+        {% if error %}
+            <div class="form-error-message">
+                {{ error }}
+            </div>
+        {% endif %}
         <form method="POST">
             <input type="text" name="username" placeholder="Username" required>
             <input type="password" name="password" placeholder="Password" required>
