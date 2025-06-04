@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{% block title %}Secure Chat{% endblock %}</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- PWA Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SecureChat">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#121212">
+    
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="app-container">
+        <div class="notification-container" id="notification-container"></div>
+        
+        {% block navbar %}
+            {% if 'username' in session %}
+            <nav class="navbar">
+                <div class="nav-brand">SecureChat</div>
+                <div class="nav-menu">
+                    <a href="{{ url_for('chat') }}" class="nav-item"><i class="fas fa-comments"></i> <span class="nav-text">Chats</span></a>
+                    <a href="{{ url_for('profile') }}" class="nav-item"><i class="fas fa-user"></i> <span class="nav-text">Profile</span></a>
+                    <a href="{{ url_for('logout') }}" class="nav-item"><i class="fas fa-sign-out-alt"></i> <span class="nav-text">Logout</span></a>
+                </div>
+            </nav>
+            {% endif %}
+        {% endblock %}
+
+        <div class="content-container">
+            {% block content %}{% endblock %}
+        </div>
+
+        <footer class="footer">
+            <p>Secure Chat Application &copy; {{ 'year'|now }}</p>
+        </footer>
+    </div>
+
+    <script>
+        function showNotification(message, type = 'info') {
+            const container = document.getElementById('notification-container');
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <span>${message}</span>
+                    <button class="notification-close" onclick="this.parentElement.parentElement.remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(notification);
+            
+            // Auto-dismiss after 5 seconds
+            setTimeout(() => {
+                notification.classList.add('fade-out');
+                setTimeout(() => {
+                    notification.remove();
+                }, 500);
+            }, 5000);
+        }
+        
+        // Check if the app is in standalone mode (added to home screen)
+        if (window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches) {
+            document.body.classList.add('standalone-mode');
+        }
+    </script>
+    
+    {% block scripts %}{% endblock %}
+    <script src="{{ url_for('static', filename='pwa.js') }}"></script>
+</body>
+</html> 

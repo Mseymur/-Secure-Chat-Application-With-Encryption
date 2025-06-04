@@ -1,0 +1,171 @@
+{% extends "layout.html" %}
+
+{% block title %}Your Profile - Secure Chat{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card mb-4">
+        <div class="card-header">
+            <h2 class="card-title">Your Profile</h2>
+        </div>
+        <div class="card-body">
+            <div class="text-center mb-4">
+                <div class="profile-avatar mb-3">
+                    <i class="fas fa-user-circle fa-6x text-primary"></i>
+                </div>
+                <h3>{{ username }}</h3>
+                <p class="text-muted">Member since {{ joined_date }}</p>
+            </div>
+            
+            <div class="mt-4">
+                <h4 class="mb-3"><i class="fas fa-chart-bar text-primary"></i> Your Statistics</h4>
+                <div class="row">
+                    <div class="col-4 text-center">
+                        <div class="stat-box p-3" style="background-color: rgba(74, 111, 165, 0.1); border-radius: var(--radius);">
+                            <div class="stat-icon mb-2">
+                                <i class="fas fa-comments fa-2x text-primary"></i>
+                            </div>
+                            <div class="stat-value">{{ stats.chats }}</div>
+                            <div class="stat-label">Chats</div>
+                        </div>
+                    </div>
+                    <div class="col-4 text-center">
+                        <div class="stat-box p-3" style="background-color: rgba(74, 111, 165, 0.1); border-radius: var(--radius);">
+                            <div class="stat-icon mb-2">
+                                <i class="fas fa-paper-plane fa-2x text-primary"></i>
+                            </div>
+                            <div class="stat-value">{{ stats.messages }}</div>
+                            <div class="stat-label">Messages</div>
+                        </div>
+                    </div>
+                    <div class="col-4 text-center">
+                        <div class="stat-box p-3" style="background-color: rgba(74, 111, 165, 0.1); border-radius: var(--radius);">
+                            <div class="stat-icon mb-2">
+                                <i class="fas fa-user-friends fa-2x text-primary"></i>
+                            </div>
+                            <div class="stat-value">{{ stats.contacts }}</div>
+                            <div class="stat-label">Contacts</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-4">
+                <h4 class="mb-3"><i class="fas fa-cog text-primary"></i> Account Settings</h4>
+                
+                <form id="changePasswordForm" method="POST" action="{{ url_for('change_password') }}" class="mb-4">
+                    <h5 class="mb-3">Change Password</h5>
+                    <div class="form-group">
+                        <label for="current_password" class="form-label">Current Password</label>
+                        <input type="password" id="current_password" name="current_password" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="new_password" class="form-label">New Password</label>
+                        <input type="password" id="new_password" name="new_password" class="form-control" required>
+                        <div class="form-text">Use a strong password with at least 8 characters.</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="confirm_password" class="form-label">Confirm New Password</label>
+                        <input type="password" id="confirm_password" name="confirm_password" class="form-control" required>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-key"></i> Change Password
+                    </button>
+                </form>
+            </div>
+            
+            <div class="mt-4" style="background-color: rgba(220, 53, 69, 0.1); border-radius: var(--radius); padding: 20px;">
+                <h4 class="text-danger mb-3"><i class="fas fa-exclamation-triangle"></i> Danger Zone</h4>
+                <p>Deleting your account will permanently remove all your data, including chats and messages. This action cannot be undone.</p>
+                <button class="btn btn-danger" onclick="confirmDeleteAccount()">
+                    <i class="fas fa-user-slash"></i> Delete Account
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal-overlay" id="confirmationModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">Confirm Account Deletion</h3>
+            <button class="modal-close" onclick="closeModal('confirmationModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Are you sure you want to delete your account? This will permanently remove all your data and cannot be undone.</p>
+            
+            <div class="form-group mt-3">
+                <label for="delete_confirmation" class="form-label">Type "DELETE" to confirm</label>
+                <input type="text" id="delete_confirmation" class="form-control" placeholder="DELETE">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('confirmationModal')">Cancel</button>
+            <button class="btn btn-danger" id="confirmDeleteBtn" disabled>Delete Account</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Modal functions
+    function openModal(modalId) {
+        document.getElementById(modalId).classList.add('active');
+    }
+    
+    function closeModal(modalId) {
+        document.getElementById(modalId).classList.remove('active');
+    }
+    
+    function confirmDeleteAccount() {
+        openModal('confirmationModal');
+        
+        // Reset the confirmation input
+        const confirmInput = document.getElementById('delete_confirmation');
+        confirmInput.value = '';
+        document.getElementById('confirmDeleteBtn').disabled = true;
+        
+        // Add event listener to the input
+        confirmInput.addEventListener('input', function() {
+            document.getElementById('confirmDeleteBtn').disabled = this.value !== 'DELETE';
+        });
+        
+        // Add event listener to the confirm button
+        document.getElementById('confirmDeleteBtn').onclick = function() {
+            if (document.getElementById('delete_confirmation').value === 'DELETE') {
+                window.location.href = "{{ url_for('delete_account') }}";
+            }
+        };
+    }
+    
+    // Password validation
+    document.getElementById('changePasswordForm').addEventListener('submit', function(event) {
+        const currentPassword = document.getElementById('current_password').value;
+        const newPassword = document.getElementById('new_password').value;
+        const confirmPassword = document.getElementById('confirm_password').value;
+        
+        if (!currentPassword || !newPassword || !confirmPassword) {
+            event.preventDefault();
+            showNotification('All password fields are required', 'warning');
+            return;
+        }
+        
+        if (newPassword.length < 8) {
+            event.preventDefault();
+            showNotification('New password must be at least 8 characters long', 'warning');
+            return;
+        }
+        
+        if (newPassword !== confirmPassword) {
+            event.preventDefault();
+            showNotification('New passwords do not match', 'warning');
+            return;
+        }
+    });
+</script>
+{% endblock %} 

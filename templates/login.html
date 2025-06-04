@@ -1,23 +1,89 @@
-<!doctype html>
-<html>
-<head>
-    <title>Login</title>
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
-</head>
-<body>
-    <div class="container">
-        <header>Welcome!</header>
-        {% if error %}
-            <div class="form-error-message">
-                {{ error }}
-            </div>
-        {% endif %}
-        <form method="POST">
-            <input type="text" name="username" placeholder="Username" required>
-            <input type="password" name="password" placeholder="Password" required>
-            <button type="submit" class="primary">Login</button>
-        </form>
-        <p>Don't have an account? <a href="{{ url_for('signup') }}">Sign Up</a></p>
+{% extends "layout.html" %}
+
+{% block title %}Login - Secure Chat{% endblock %}
+
+{% block navbar %}
+<!-- No navbar on login page -->
+{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-logo">
+        <h1>SecureChat</h1>
+        <p>Login to your account</p>
     </div>
-</body>
-</html>
+
+    <div class="auth-card">
+        <form method="POST" id="loginForm" novalidate>
+            <div class="form-group">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" id="username" name="username" class="form-control" required>
+                <div class="form-text error-text" id="username-error"></div>
+            </div>
+            
+            <div class="form-group">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" id="password" name="password" class="form-control" required>
+                <div class="form-text error-text" id="password-error"></div>
+            </div>
+            
+            <div class="form-group">
+                <label for="totp_code" class="form-label">Authentication Code</label>
+                <input type="text" id="totp_code" name="totp_code" class="form-control" required autocomplete="off" placeholder="Enter 6-digit code from your authenticator app">
+                <div class="form-text error-text" id="totp-error"></div>
+                <div class="form-text">Enter the 6-digit code from your authenticator app</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block mt-4">
+                <i class="fas fa-sign-in-alt"></i> Login
+            </button>
+        </form>
+    </div>
+    
+    <div class="auth-footer mt-4">
+        <p>Don't have an account? <a href="{{ url_for('signup') }}">Sign Up</a></p>
+        <a href="{{ url_for('home') }}" class="text-muted"><i class="fas fa-arrow-left"></i> Back to Home</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('loginForm').addEventListener('submit', function(event) {
+        let isValid = true;
+        const username = document.getElementById('username');
+        const password = document.getElementById('password');
+        const totpCode = document.getElementById('totp_code');
+        const usernameError = document.getElementById('username-error');
+        const passwordError = document.getElementById('password-error');
+        const totpError = document.getElementById('totp-error');
+        
+        // Reset errors
+        usernameError.textContent = '';
+        passwordError.textContent = '';
+        totpError.textContent = '';
+        
+        if (!username.value.trim()) {
+            usernameError.textContent = 'Username is required';
+            isValid = false;
+        }
+        
+        if (!password.value.trim()) {
+            passwordError.textContent = 'Password is required';
+            isValid = false;
+        }
+        
+        if (!totpCode.value.trim()) {
+            totpError.textContent = 'Authentication code is required';
+            isValid = false;
+        } else if (!/^\d{6}$/.test(totpCode.value.trim())) {
+            totpError.textContent = 'Authentication code must be 6 digits';
+            isValid = false;
+        }
+        
+        if (!isValid) {
+            event.preventDefault();
+        }
+    });
+</script>
+{% endblock %}

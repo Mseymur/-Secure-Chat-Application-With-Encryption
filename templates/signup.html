@@ -1,23 +1,100 @@
-<!doctype html>
-<html>
-<head>
-    <title>Sign Up</title>
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
-</head>
-<body>
-    <div class="container">
-        <header>Sign Up</header>
-        {% if error %}
-            <div class="form-error-message">
-                {{ error }}
-            </div>
-        {% endif %}
-        <form method="POST">
-            <input type="text" name="username" placeholder="Username" required>
-            <input type="password" name="password" placeholder="Password" required>
-            <button type="submit" class="accent">Sign Up</button>
-        </form>
-        <p>Already have an account? <a href="{{ url_for('login') }}">Login</a></p>
+{% extends "layout.html" %}
+
+{% block title %}Sign Up - Secure Chat{% endblock %}
+
+{% block navbar %}
+<!-- No navbar on signup page -->
+{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-logo">
+        <h1>SecureChat</h1>
+        <p>Create a new account</p>
     </div>
-</body>
-</html>
+
+    <div class="auth-card">
+        <form method="POST" id="signupForm" novalidate>
+            <div class="form-group">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" id="username" name="username" class="form-control" required>
+                <div class="form-text error-text" id="username-error"></div>
+                <div class="form-text">Choose a unique username for your account.</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" id="password" name="password" class="form-control" required>
+                <div class="form-text error-text" id="password-error"></div>
+                <div class="form-text">Use a strong password with at least 8 characters.</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="confirm-password" class="form-label">Confirm Password</label>
+                <input type="password" id="confirm-password" name="confirm-password" class="form-control" required>
+                <div class="form-text error-text" id="confirm-password-error"></div>
+            </div>
+
+            <div class="form-text mb-3">
+                After signing up, you will be provided with a QR code to set up two-factor authentication.
+            </div>
+
+            <button type="submit" class="btn btn-accent btn-block mt-4">
+                <i class="fas fa-user-plus"></i> Create Account
+            </button>
+        </form>
+    </div>
+    
+    <div class="auth-footer mt-4">
+        <p>Already have an account? <a href="{{ url_for('login') }}">Login</a></p>
+        <a href="{{ url_for('home') }}" class="text-muted"><i class="fas fa-arrow-left"></i> Back to Home</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('signupForm').addEventListener('submit', function(event) {
+        let isValid = true;
+        const username = document.getElementById('username');
+        const password = document.getElementById('password');
+        const confirmPassword = document.getElementById('confirm-password');
+        const usernameError = document.getElementById('username-error');
+        const passwordError = document.getElementById('password-error');
+        const confirmPasswordError = document.getElementById('confirm-password-error');
+        
+        // Reset errors
+        usernameError.textContent = '';
+        passwordError.textContent = '';
+        confirmPasswordError.textContent = '';
+        
+        if (!username.value.trim()) {
+            usernameError.textContent = 'Username is required';
+            isValid = false;
+        } else if (username.value.trim().length < 3) {
+            usernameError.textContent = 'Username must be at least 3 characters long';
+            isValid = false;
+        }
+        
+        if (!password.value) {
+            passwordError.textContent = 'Password is required';
+            isValid = false;
+        } else if (password.value.length < 8) {
+            passwordError.textContent = 'Password must be at least 8 characters long';
+            isValid = false;
+        }
+        
+        if (!confirmPassword.value) {
+            confirmPasswordError.textContent = 'Please confirm your password';
+            isValid = false;
+        } else if (password.value !== confirmPassword.value) {
+            confirmPasswordError.textContent = 'Passwords do not match';
+            isValid = false;
+        }
+        
+        if (!isValid) {
+            event.preventDefault();
+        }
+    });
+</script>
+{% endblock %}

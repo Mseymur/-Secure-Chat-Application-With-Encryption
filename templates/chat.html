@@ -1,223 +1,200 @@
-<!doctype html>
-<html>
-<head>
-    <title>Chats</title>
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
-    <style>
-        /* Adding a simple active class for buttons, can be enhanced in main CSS */
-        .action-buttons .button.active {
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
-            filter: brightness(90%);
-        }
-    </style>
-    <script>
-        function showJoinForm() {
-            document.getElementById('join-form').style.display = 'block';
-            document.getElementById('create-form').style.display = 'none';
-            const mainContainer = document.querySelector('.container');
-            if (mainContainer) {
-                mainContainer.classList.add('form-active', 'join-form-active');
-                mainContainer.classList.remove('create-form-active');
-            }
-            // Button active state
-            const joinBtn = document.getElementById('join-form-btn');
-            const createBtn = document.getElementById('create-form-btn');
-            if(joinBtn) joinBtn.classList.add('active');
-            if(createBtn) createBtn.classList.remove('active');
-        }
+{% extends "layout.html" %}
 
-        function showCreateForm() {
-            document.getElementById('join-form').style.display = 'none';
-            document.getElementById('create-form').style.display = 'block';
-            const mainContainer = document.querySelector('.container');
-            if (mainContainer) {
-                mainContainer.classList.add('form-active', 'create-form-active');
-                mainContainer.classList.remove('join-form-active');
-            }
-            // Button active state
-            const joinBtn = document.getElementById('join-form-btn');
-            const createBtn = document.getElementById('create-form-btn');
-            if(joinBtn) joinBtn.classList.remove('active');
-            if(createBtn) createBtn.classList.add('active');
-        }
+{% block title %}Your Chats - Secure Chat{% endblock %}
 
-        function hideForms() {
-            document.getElementById('join-form').style.display = 'none';
-            document.getElementById('create-form').style.display = 'none';
-            const mainContainer = document.querySelector('.container');
-            if (mainContainer) {
-                mainContainer.classList.remove('form-active', 'join-form-active', 'create-form-active');
-            }
-             // Button active state
-            const joinBtn = document.getElementById('join-form-btn');
-            const createBtn = document.getElementById('create-form-btn');
-            if(joinBtn) joinBtn.classList.remove('active');
-            if(createBtn) createBtn.classList.remove('active');
-        }
+{% block head %}
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+{% endblock %}
 
-        function loadChats() {
-            fetch('/get_chats')
-                .then(response => response.json())
-                .then(data => {
-                    let chatList = document.getElementById('chat-list');
-                    chatList.innerHTML = '';
-                    if (data.chats && data.chats.length > 0) {
-                        data.chats.forEach(chat => {
-                            chatList.innerHTML += `<div class="chat-item"><a href="/chat_room/${chat.chat_id}">${chat.chat_name}</a></div>`;
-                        });
-                    } else {
-                        chatList.innerHTML = '<p class="text-muted" style="padding: 10px 0;">No chats available. Create one!</p>';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error loading chats:', error);
-                    let chatList = document.getElementById('chat-list');
-                    chatList.innerHTML = '<p class="text-muted" style="padding: 10px 0;">Could not load chats. Please try again later.</p>';
-                    if (typeof showModal === 'function') showModal('Error', 'Could not load chats. Please check your connection or try refreshing.', 'error');
-                });
-        }
-    </script>
-</head>
-<body>
-    <div class="container">
-        <header>Available Chats</header>
-        <p style="text-align:center; margin-bottom:20px; color: var(--text-muted-color);">
-            Manage your secure chats, create new ones, or join existing conversations using an encryption key.
-        </p>
-        <div id="chat-list" style="width: 100%; margin-bottom: 20px;"></div>
-
-        <div class="action-buttons" style="display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
-            <button id="join-form-btn" class="button primary" onclick="showJoinForm()">Join Chat</button>
-            <button id="create-form-btn" class="button accent" onclick="showCreateForm()">Create Chat</button>
-            <button class="button danger" onclick="deleteAllChats()">Delete All Chats</button>
-        </div>
-
-        <div id="join-form" style="display:none; width:100%;" class="form-container">
-            <h2>Join Existing Chat</h2>
-            <p class="text-muted" style="font-size:0.9em; margin-bottom:10px; text-align:left;">
-                Enter the unique encryption key shared by the chat creator to join an existing chat.
-            </p>
-            <form method="post" action="{{ url_for('chat') }}" style="display: flex; flex-direction: column; align-items: center;">
-                <input type="hidden" name="action" value="join">
-                {% if join_error %}
-                    <div class="form-error-message">
-                        {{ join_error }}
-                    </div>
-                {% endif %}
-                <input type="text" name="encryption_key" placeholder="Enter Encryption Key" required style="width: 100%; max-width: 350px;" value="{{ encryption_key_value if encryption_key_value else '' }}">
-                <button type="submit" class="button primary" style="margin-top:15px;">Join Chat by Key</button>
-            </form>
-        </div>
-
-        <div id="create-form" style="display:none; width:100%;" class="form-container">
-            <h2>Create New Chat</h2>
-            <p class="text-muted" style="font-size:0.9em; margin-bottom:10px; text-align:left;">
-                Give your new chat a name. A unique encryption key will be generated for you to share once the chat is created (visible in the chat room).
-            </p>
-            <form method="post" action="{{ url_for('chat') }}" style="display: flex; flex-direction: column; align-items: center;">
-                <input type="hidden" name="action" value="create">
-                <input type="text" name="chat_name" placeholder="Enter New Chat Name" required style="width: 100%; max-width: 350px;">
-                <button type="submit" class="button accent" style="margin-top:15px;">Create New Chat</button>
-            </form>
-        </div>
-
-        <div style="margin-top: 30px;">
-            <a href="{{ url_for('logout') }}"><button class="button secondary">Logout</button></a>
-        </div>
-    </div>
-
-    <div id="customModal" class="modal-backdrop" style="display:none;">
-        <div class="modal-content">
-            <h3 id="modalTitle" class="modal-title">Modal Title</h3>
-            <p id="modalMessage" class="modal-message">Modal message goes here.</p>
-            <div class="modal-buttons">
-                <button id="modalConfirmBtn" class="button primary">Confirm</button>
-                <button id="modalCancelBtn" class="button secondary">Cancel</button>
-                <button id="modalOkBtn" class="button primary">OK</button>
+{% block content %}
+<div class="chat-container">
+    <div class="card mb-4">
+        <div class="card-header">
+            <h2 class="card-title">Your Chats</h2>
+            <div>
+                <button class="btn btn-primary btn-sm" onclick="openModal('createChatModal')">
+                    <i class="fas fa-plus"></i> New Chat
+                </button>
+                <button class="btn btn-accent btn-sm" onclick="openModal('joinChatModal')">
+                    <i class="fas fa-sign-in-alt"></i> Join Chat
+                </button>
             </div>
         </div>
+        <div class="card-body">
+            <div id="chat-list" class="chat-list">
+                <!-- Chat list will be loaded here -->
+                <div class="text-center p-4">
+                    <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                    <p>Loading your chats...</p>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer">
+            <button class="btn btn-danger btn-sm" onclick="confirmDeleteAllChats()">
+                <i class="fas fa-trash-alt"></i> Delete All Chats
+            </button>
+        </div>
     </div>
+</div>
 
-    <script>
-        // --- Custom Modal Logic (from previous step) ---
-        const modalElement = document.getElementById('customModal');
-        const modalTitleElement = document.getElementById('modalTitle');
-        const modalMessageElement = document.getElementById('modalMessage');
-        const modalConfirmBtn = document.getElementById('modalConfirmBtn');
-        const modalCancelBtn = document.getElementById('modalCancelBtn');
-        const modalOkBtn = document.getElementById('modalOkBtn');
-        let confirmCallback = null;
-        let cancelCallback = null;
+<!-- Create Chat Modal -->
+<div class="modal-overlay" id="createChatModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">Create New Chat</h3>
+            <button class="modal-close" onclick="closeModal('createChatModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="createChatForm" method="post" action="{{ url_for('chat') }}">
+                <input type="hidden" name="action" value="create">
+                <div class="form-group">
+                    <label for="chat_name" class="form-label">Chat Name</label>
+                    <input type="text" id="chat_name" name="chat_name" class="form-control" placeholder="Enter a name for your chat" required>
+                    <div class="form-text">This name will help you identify your chat.</div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('createChatModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="document.getElementById('createChatForm').submit()">Create Chat</button>
+        </div>
+    </div>
+</div>
 
-        function showModal(title, message, type = 'alert', onConfirm, onCancel) {
-            modalTitleElement.textContent = title;
-            modalMessageElement.textContent = message;
-            modalConfirmBtn.style.display = 'none';
-            modalCancelBtn.style.display = 'none';
-            modalOkBtn.style.display = 'none';
-            const modalContentDiv = modalElement.querySelector('.modal-content');
-            modalContentDiv.classList.remove('error', 'success');
-            if (type === 'confirm') {
-                modalConfirmBtn.style.display = 'inline-block';
-                modalCancelBtn.style.display = 'inline-block';
-                confirmCallback = onConfirm;
-                cancelCallback = onCancel;
-            } else if (type === 'alert' || type === 'error' || type === 'success') {
-                modalOkBtn.style.display = 'inline-block';
-                confirmCallback = onConfirm;
-                 if (type === 'error') modalContentDiv.classList.add('error');
-                 else if (type === 'success') modalContentDiv.classList.add('success');
-            }
-            modalElement.classList.add('show');
-        }
+<!-- Join Chat Modal -->
+<div class="modal-overlay" id="joinChatModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">Join Existing Chat</h3>
+            <button class="modal-close" onclick="closeModal('joinChatModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="joinChatForm" method="post" action="{{ url_for('chat') }}">
+                <input type="hidden" name="action" value="join">
+                <div class="form-group">
+                    <label for="encryption_key" class="form-label">Encryption Key</label>
+                    <input type="text" id="encryption_key" name="encryption_key" class="form-control" placeholder="Paste the encryption key here" required>
+                    <div class="form-text">Ask the chat creator to share the encryption key with you.</div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('joinChatModal')">Cancel</button>
+            <button class="btn btn-accent" onclick="document.getElementById('joinChatForm').submit()">Join Chat</button>
+        </div>
+    </div>
+</div>
 
-        function hideModal() {
-            modalElement.classList.remove('show');
-            confirmCallback = null;
-            cancelCallback = null;
-        }
-        modalConfirmBtn.addEventListener('click', () => { if (typeof confirmCallback === 'function') confirmCallback(); hideModal(); });
-        modalCancelBtn.addEventListener('click', () => { if (typeof cancelCallback === 'function') cancelCallback(); hideModal(); });
-        modalOkBtn.addEventListener('click', () => { if (typeof confirmCallback === 'function') confirmCallback(); hideModal(); });
-        modalElement.addEventListener('click', (event) => {
-            if (event.target === modalElement) {
-                if (modalCancelBtn.style.display !== 'none' || modalOkBtn.style.display !== 'none') {
-                    if (typeof cancelCallback === 'function' && modalCancelBtn.style.display !== 'none') cancelCallback();
-                    else if (typeof confirmCallback === 'function' && modalOkBtn.style.display !== 'none') confirmCallback();
-                    hideModal();
+<!-- Confirmation Modal -->
+<div class="modal-overlay" id="confirmationModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">Confirm Action</h3>
+            <button class="modal-close" onclick="closeModal('confirmationModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p id="confirmationMessage">Are you sure you want to perform this action?</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('confirmationModal')">Cancel</button>
+            <button class="btn btn-danger" id="confirmButton">Confirm</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Modal functions
+    function openModal(modalId) {
+        document.getElementById(modalId).classList.add('active');
+    }
+    
+    function closeModal(modalId) {
+        document.getElementById(modalId).classList.remove('active');
+    }
+    
+    // Load chats function
+    function loadChats() {
+        fetch('/get_chats')
+            .then(response => response.json())
+            .then(data => {
+                let chatList = document.getElementById('chat-list');
+                chatList.innerHTML = ''; // Clear existing list
+                
+                if (data.chats && data.chats.length > 0) {
+                    data.chats.forEach(chat => {
+                        chatList.innerHTML += `
+                            <div class="chat-list-item">
+                                <a href="/chat_room/${chat.chat_id}" class="chat-list-link">
+                                    <div class="chat-list-icon">
+                                        <i class="fas fa-comments"></i>
+                                    </div>
+                                    <div class="chat-list-content">
+                                        <div class="chat-list-title">${chat.chat_name || 'Unnamed Chat'}</div>
+                                        <div class="chat-list-subtitle">
+                                            ${chat.user2_id ? '2 participants' : '1 participant'}
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                        `;
+                    });
+                } else {
+                    chatList.innerHTML = `
+                        <div class="text-center p-4">
+                            <i class="fas fa-comments text-muted fa-3x mb-3"></i>
+                            <p>No chats available. Create one or join an existing chat!</p>
+                        </div>
+                    `;
                 }
-            }
-        });
-        // --- End Custom Modal Logic ---
-
-        function deleteAllChats() {
-            showModal('Confirm Delete All', 'Are you sure you want to delete all your chats? This action cannot be undone.', 'confirm', () => {
-                fetch('/delete_all_chats', {
-                    method: 'POST'
-                }).then(response => response.json()).then(data => {
-                    if (data.success) {
-                        loadChats(); // Reload chat list
-                        hideForms(); // Hide any open forms
-                        showModal('Success', data.message || 'All chats deleted successfully.', 'success');
-                    } else {
-                        showModal('Error', "Failed to delete chats: " + (data.message || "Unknown error."), 'error');
-                    }
-                }).catch(error => {
-                    console.error('Error deleting chats:', error);
-                    showModal('Error', "An error occurred while deleting chats.", 'error');
-                });
+            })
+            .catch(error => {
+                console.error('Error loading chats:', error);
+                let chatList = document.getElementById('chat-list');
+                chatList.innerHTML = `
+                    <div class="text-center p-4">
+                        <i class="fas fa-exclamation-circle text-danger fa-3x mb-3"></i>
+                        <p>Could not load chats. Please try again later.</p>
+                        <button class="btn btn-primary mt-3" onclick="loadChats()">
+                            <i class="fas fa-sync"></i> Retry
+                        </button>
+                    </div>
+                `;
             });
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initial setup calls
-            loadChats();
-            hideForms(); // Start with forms hidden, unless an error needs to show one
-
-            {% if show_join_form and join_error %}
-                showJoinForm();
-            {% endif %}
+    }
+    
+    // Delete all chats
+    function confirmDeleteAllChats() {
+        document.getElementById('confirmationMessage').textContent = 'Are you sure you want to delete all chats? This action cannot be undone.';
+        document.getElementById('confirmButton').onclick = deleteAllChats;
+        openModal('confirmationModal');
+    }
+    
+    function deleteAllChats() {
+        closeModal('confirmationModal');
+        
+        fetch('/delete_all_chats', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                loadChats();
+                showNotification('All chats have been deleted successfully.', 'success');
+            } else {
+                showNotification('Failed to delete chats: ' + (data.message || 'Unknown error'), 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting chats:', error);
+            showNotification('An error occurred while deleting chats.', 'error');
         });
-    </script>
-</body>
-</html>
+    }
+    
+    // Initialize
+    window.onload = function() {
+        loadChats();
+    };
+</script>
+{% endblock %}

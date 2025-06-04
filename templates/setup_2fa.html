@@ -1,0 +1,114 @@
+{% extends "layout.html" %}
+
+{% block title %}Set Up Two-Factor Authentication - Secure Chat{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-logo">
+        <h1>SecureChat</h1>
+        <p>Set Up Two-Factor Authentication</p>
+    </div>
+
+    <div class="auth-card">
+        <div class="card-body">
+            <div class="text-center mb-4">
+                <i class="fas fa-shield-alt fa-3x text-primary mb-3"></i>
+                <h3>Welcome, {{ username }}!</h3>
+                <p>Scan this QR code with your authenticator app to set up two-factor authentication.</p>
+            </div>
+            
+            <div class="qr-container text-center mb-4">
+                <img src="{{ url_for('generate_qrcode', totp_uri=totp_uri) }}" alt="QR Code" class="qr-code">
+            </div>
+            
+            <div class="form-group">
+                <label for="secret-key" class="form-label">Or enter this secret key manually:</label>
+                <div class="d-flex">
+                    <input type="text" id="secret-key" class="form-control" value="{{ totp_secret }}" readonly>
+                    <button id="copy-secret-btn" class="btn btn-secondary ml-2" onclick="copySecret()">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="alert mt-4" style="background-color: rgba(74, 111, 165, 0.1); border-left: 4px solid var(--primary-color); padding: 15px; border-radius: var(--radius);">
+                <h4 class="mb-2"><i class="fas fa-info-circle"></i> Important</h4>
+                <p class="mb-2">For enhanced security, you will need <strong>both your password and an authentication code</strong> to log in to your account.</p>
+                <p class="mb-2">Every time you log in:</p>
+                <ol>
+                    <li>Enter your username and password</li>
+                    <li>Enter the 6-digit code from your authenticator app</li>
+                </ol>
+                <p class="mb-0">Popular authenticator apps include:</p>
+                <ul>
+                    <li>Google Authenticator</li>
+                    <li>Microsoft Authenticator</li>
+                    <li>Authy</li>
+                </ul>
+            </div>
+        </div>
+        <div class="card-footer">
+            <a href="{{ url_for('welcome') }}" class="btn btn-primary btn-block">
+                <i class="fas fa-check-circle"></i> I've Set Up My Authenticator
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function copySecret() {
+        const secretInput = document.getElementById('secret-key');
+        const copyButton = document.getElementById('copy-secret-btn');
+        
+        // Use modern clipboard API with fallback
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                // Modern approach for secure contexts
+                navigator.clipboard.writeText(secretInput.value)
+                    .then(() => {
+                        showNotification('Secret key copied to clipboard', 'success');
+                        copyButton.innerHTML = '<i class="fas fa-check"></i>';
+                        setTimeout(() => {
+                            copyButton.innerHTML = '<i class="fas fa-copy"></i>';
+                        }, 2000);
+                    })
+                    .catch(err => {
+                        console.error('Failed to copy: ', err);
+                        fallbackCopyMethod(secretInput, copyButton);
+                    });
+            } else {
+                // Fallback for older browsers or non-secure contexts
+                fallbackCopyMethod(secretInput, copyButton);
+            }
+        } catch (err) {
+            console.error('Error copying: ', err);
+            fallbackCopyMethod(secretInput, copyButton);
+        }
+    }
+    
+    function fallbackCopyMethod(element, button) {
+        // Fallback to selection approach
+        element.select();
+        element.setSelectionRange(0, 99999);
+        
+        try {
+            const successful = document.execCommand('copy');
+            if (successful) {
+                showNotification('Secret key copied to clipboard', 'success');
+                button.innerHTML = '<i class="fas fa-check"></i>';
+                setTimeout(() => {
+                    button.innerHTML = '<i class="fas fa-copy"></i>';
+                }, 2000);
+            } else {
+                showNotification('Failed to copy key. Please copy it manually', 'warning');
+            }
+        } catch (err) {
+            showNotification('Failed to copy key. Please copy it manually', 'error');
+        }
+        
+        window.getSelection().removeAllRanges();
+    }
+</script>
+{% endblock %} 

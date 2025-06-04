@@ -1,0 +1,55 @@
+{% extends "layout.html" %}
+
+{% block title %}Welcome to SecureChat{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card mb-4">
+        <div class="card-header">
+            <h2 class="card-title">Welcome to SecureChat, {{ username }}!</h2>
+        </div>
+        <div class="card-body">
+            <div class="text-center mb-4">
+                <i class="fas fa-shield-alt fa-4x text-primary mb-3"></i>
+                <h3>Your secure messaging journey begins here</h3>
+                <p>Thank you for signing up. Let's get you started with secure messaging.</p>
+            </div>
+            
+            <div class="mb-4">
+                <h4><i class="fas fa-lock text-primary"></i> End-to-End Encryption</h4>
+                <p>SecureChat uses end-to-end encryption to ensure that only you and your chat partner can read your messages. No one else, not even us, can access your conversations.</p>
+            </div>
+            
+            <div class="mb-4">
+                <h4><i class="fas fa-key text-primary"></i> How Encryption Keys Work</h4>
+                <p>Each chat has a unique encryption key. To chat with someone:</p>
+                <ol>
+                    <li>Create a new chat and share the encryption key with your partner</li>
+                    <li>Your partner uses this key to join your chat</li>
+                    <li>Messages are automatically encrypted and decrypted</li>
+                </ol>
+                <div class="alert" style="background-color: rgba(74, 111, 165, 0.1); border-left: 4px solid var(--primary-color); padding: 15px; border-radius: var(--radius);">
+                    <strong>Important:</strong> Always share encryption keys through secure channels, not in the chat itself.
+                </div>
+            </div>
+            
+            <div class="mb-4">
+                <h4><i class="fas fa-user-shield text-primary"></i> Security Tips</h4>
+                <ul>
+                    <li>Never share your encryption keys publicly</li>
+                    <li>Use a strong, unique password for your account</li>
+                    <li>Log out when using shared devices</li>
+                    <li>Keep your browser and system updated</li>
+                </ul>
+            </div>
+        </div>
+        <div class="card-footer">
+            <div class="d-flex justify-content-center">
+                <a href="{{ url_for('chat') }}" class="btn btn-primary">
+                    <i class="fas fa-comments"></i> Start Chatting
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
